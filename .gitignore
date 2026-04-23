@@ -1,0 +1,5 @@
+/data
+*.db
+certs/*.crt
+certs/*.key
+.DS_Store
