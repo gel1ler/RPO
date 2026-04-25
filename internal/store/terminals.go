@@ -32,6 +32,22 @@ type Terminals struct {
 	DB *sql.DB
 }
 
+func (s Terminals) GetBySerialNumber(ctx context.Context, serialNumber string) (Terminal, error) {
+	var t Terminal
+	err := s.DB.QueryRowContext(ctx, `
+SELECT id, serial_number, address, name, extra, created_at
+FROM terminals
+WHERE serial_number = ?
+`, serialNumber).Scan(&t.ID, &t.SerialNumber, &t.Address, &t.Name, &t.Extra, &t.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Terminal{}, ErrNotFound
+	}
+	if err != nil {
+		return Terminal{}, err
+	}
+	return t, nil
+}
+
 func (s Terminals) List(ctx context.Context, limit int64, offset int64) ([]Terminal, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 100

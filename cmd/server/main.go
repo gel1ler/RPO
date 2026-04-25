@@ -1,3 +1,14 @@
+// Package main RPO REST API.
+//
+// @title           RPO Authorization API
+// @version         1.0
+// @description     REST API сервера авторизации платежей транспортными картами.
+// @BasePath        /api/v1
+// @schemes         https
+//
+// @securityDefinitions.apikey  BearerAuth
+// @in                          header
+// @name                        Authorization
 package main
 
 import (

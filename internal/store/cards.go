@@ -38,6 +38,24 @@ type Cards struct {
 	DB *sql.DB
 }
 
+func (s Cards) GetByCardNumber(ctx context.Context, cardNumber string) (Card, error) {
+	var c Card
+	var isBlocked int64
+	err := s.DB.QueryRowContext(ctx, `
+SELECT id, card_number, balance, is_blocked, owner_name, extra, key_id, created_at
+FROM cards
+WHERE card_number = ?
+`, cardNumber).Scan(&c.ID, &c.CardNumber, &c.Balance, &isBlocked, &c.OwnerName, &c.Extra, &c.KeyID, &c.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Card{}, ErrNotFound
+	}
+	if err != nil {
+		return Card{}, err
+	}
+	c.IsBlocked = isBlocked == 1
+	return c, nil
+}
+
 func (s Cards) List(ctx context.Context, limit int64, offset int64) ([]Card, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 100

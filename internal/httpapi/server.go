@@ -6,8 +6,11 @@ import (
 	"strconv"
 	"time"
 
+	_ "rpo/docs"
 	"rpo/internal/auth"
 	"rpo/internal/store"
+
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
 type Server struct {
@@ -18,12 +21,25 @@ type Server struct {
 func (s Server) Router() http.Handler {
 	mux := http.NewServeMux()
 
+	mux.HandleFunc("GET /api/v1", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	})
+
 	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 
+	mux.Handle("GET /api/v1/swagger/*", httpSwagger.WrapHandler)
+	mux.HandleFunc("GET /api/v1/swagger", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/api/v1/swagger/index.html", http.StatusFound)
+	})
+
 	mux.Handle("POST /api/v1/auth/login", http.HandlerFunc(s.handleLogin))
 	mux.Handle("GET /api/v1/me", requireAuth(s.JWT, http.HandlerFunc(s.handleMe)))
+
+	// terminal API (no auth)
+	mux.Handle("POST /api/v1/terminal/authorize", http.HandlerFunc(s.handleTerminalAuthorize))
+	mux.Handle("GET /api/v1/terminal/keys", http.HandlerFunc(s.handleTerminalKeys))
 
 	authed := func(h http.HandlerFunc) http.Handler {
 		return requireAuth(s.JWT, h)
@@ -97,6 +113,18 @@ type loginResponse struct {
 	Token string `json:"token"`
 }
 
+// handleLogin godoc
+// @Summary      Login with password
+// @Description  Returns JWT token
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      SwaggerAuthLoginRequest  true  "Credentials"
+// @Success      200   {object}  SwaggerAuthLoginResponse
+// @Failure      400   {object}  SwaggerErrorResponse
+// @Failure      401   {object}  SwaggerErrorResponse
+// @Failure      500   {object}  SwaggerErrorResponse
+// @Router       /auth/login [post]
 func (s Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -139,6 +167,15 @@ type meResponse struct {
 	CreatedAt   string  `json:"created_at"`
 }
 
+// handleMe godoc
+// @Summary      Current user
+// @Tags         auth
+// @Produce      json
+// @Success      200  {object}  SwaggerMeResponse
+// @Failure      401  {object}  SwaggerErrorResponse
+// @Failure      500  {object}  SwaggerErrorResponse
+// @Router       /me [get]
+// @Security     BearerAuth
 func (s Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	userID, ok := currentUserID(r.Context())
 	if !ok {
