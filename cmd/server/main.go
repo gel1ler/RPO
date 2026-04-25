@@ -1,14 +1,20 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/pressly/goose/v3"
 	_ "modernc.org/sqlite"
+
+	"rpo/internal/auth"
+	"rpo/internal/httpapi"
+	"rpo/internal/store"
 )
 
 //go:embed migrations/*.sql
@@ -43,11 +49,32 @@ func main() {
 		log.Fatalf("migrate: %v", err)
 	}
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		_, _ = w.Write([]byte(`{"status":"ok"}`))
-	})
+	adminLogin := os.Getenv("APP_ADMIN_LOGIN")
+	adminPassword := os.Getenv("APP_ADMIN_PASSWORD")
+	if adminLogin != "" && adminPassword != "" {
+		hash, err := auth.HashPassword(adminPassword)
+		if err != nil {
+			log.Fatalf("admin password hash: %v", err)
+		}
+		if _, err := (store.Users{DB: db}).EnsureAdmin(context.Background(), adminLogin, hash); err != nil {
+			log.Fatalf("ensure admin: %v", err)
+		}
+		log.Printf("admin ensured: %s", adminLogin)
+	}
+
+	jwtSecret := os.Getenv("APP_JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "dev-secret-change-me"
+	}
+
+	api := httpapi.Server{
+		DB: db,
+		JWT: auth.JWT{
+			Secret: []byte(jwtSecret),
+			Issuer: "rpo",
+			TTL:    24 * time.Hour,
+		},
+	}
 
 	addr := os.Getenv("APP_HTTP_ADDR")
 	if addr == "" {
@@ -55,7 +82,7 @@ func main() {
 	}
 
 	log.Printf("listening %s", addr)
-	log.Fatal(http.ListenAndServe(addr, mux))
+	log.Fatal(http.ListenAndServe(addr, api.Router()))
 }
 
 func dirOf(path string) string {

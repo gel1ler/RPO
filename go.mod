@@ -1,9 +1,11 @@
 module rpo
 
-go 1.22
+go 1.25.0
 
 require (
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/pressly/goose/v3 v3.21.1
+	golang.org/x/crypto v0.50.0
 	modernc.org/sqlite v1.29.6
 )
 
@@ -18,7 +20,7 @@ require (
 	github.com/sethvargo/go-retry v0.2.4 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/sync v0.7.0 // indirect
-	golang.org/x/sys v0.18.0 // indirect
+	golang.org/x/sys v0.43.0 // indirect
 	modernc.org/gc/v3 v3.0.0-20240107210532-573471604cb6 // indirect
 	modernc.org/libc v1.41.0 // indirect
 	modernc.org/mathutil v1.6.0 // indirect
