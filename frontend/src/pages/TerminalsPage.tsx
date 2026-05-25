@@ -1,11 +1,11 @@
-import { Box, Button, Typography } from '@mui/material'
+import { Box, Button, Typography, Paper, Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material'
 import { Add } from '@mui/icons-material'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { CrudTable } from '../components/CrudTable'
 import { EntityDialog, type FormValues } from '../components/EntityDialog'
 import type { FormFieldDef } from '../components/EntityDialog'
 import * as api from '../api/resources'
-import type { Terminal } from '../types/api'
+import type { Terminal, TerminalEvent } from '../types/api'
 
 const createFields: FormFieldDef[] = [
   { name: 'serial_number', label: 'Серийный номер', type: 'text', required: true },
@@ -16,11 +16,18 @@ const createFields: FormFieldDef[] = [
 
 const editFields: FormFieldDef[] = createFields.filter((f) => f.name !== 'serial_number')
 
+function fmtApprove(e: TerminalEvent): string {
+  if (typeof e.approved !== 'boolean') return '—'
+  return e.approved ? 'Да' : 'Нет'
+}
+
 export function TerminalsPage() {
   const [rows, setRows] = useState<Terminal[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editRow, setEditRow] = useState<Terminal | null>(null)
+  const [events, setEvents] = useState<TerminalEvent[]>([])
+  const sinceRef = useRef(0)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -34,6 +41,28 @@ export function TerminalsPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void (async () => {
+        try {
+          const { items } = await api.listTerminalEvents(sinceRef.current)
+          if (items.length === 0) return
+          const highest = Math.max(...items.map((it) => it.id))
+          sinceRef.current = Math.max(sinceRef.current, highest)
+          setEvents((prev) => {
+            const byId = new Map<number, TerminalEvent>()
+            prev.forEach((e) => byId.set(e.id, e))
+            items.forEach((e) => byId.set(e.id, e))
+            return [...byId.values()].sort((a, b) => b.id - a.id).slice(0, 120)
+          })
+        } catch {
+          /* сеть недоступна — тихий пропуск */
+        }
+      })()
+    }, 2000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   const openCreate = () => {
     setEditRow(null)
@@ -108,6 +137,49 @@ export function TerminalsPage() {
         onClose={() => setDialogOpen(false)}
         onSubmit={onSubmit}
       />
+
+      <Typography variant="h6" sx={{ mt: 4, mb: 1 }}>
+        Журнал терминала (обновление ~2 сек)
+      </Typography>
+      <Paper variant="outlined" sx={{ maxHeight: 420, overflow: 'auto' }}>
+        <Table size="small" stickyHeader>
+          <TableHead>
+            <TableRow>
+              <TableCell>Причина / время</TableCell>
+              <TableCell>Операция</TableCell>
+              <TableCell>SN</TableCell>
+              <TableCell>Карта</TableCell>
+              <TableCell align="right">Сумма</TableCell>
+              <TableCell align="right">Поездки Δ</TableCell>
+              <TableCell>ОК</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {events.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} align="center">
+                  Пока нет событий (появятся после работы приложения-терминала)
+                </TableCell>
+              </TableRow>
+            ) : (
+              events.map((e) => (
+                <TableRow key={e.id} hover>
+                  <TableCell>
+                    {e.created_at}
+                    {e.reason != null ? ` — ${e.reason}` : ''}
+                  </TableCell>
+                  <TableCell>{e.operation}</TableCell>
+                  <TableCell>{e.terminal_serial}</TableCell>
+                  <TableCell>{e.card_number}</TableCell>
+                  <TableCell align="right">{e.amount}</TableCell>
+                  <TableCell align="right">{e.trips_delta}</TableCell>
+                  <TableCell>{fmtApprove(e)}</TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </Paper>
     </Box>
   )
 }

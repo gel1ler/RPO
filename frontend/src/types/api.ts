@@ -48,6 +48,18 @@ export interface TransactionEntity {
   created_at: string
 }
 
+export interface TerminalEvent {
+  id: number
+  terminal_serial: string
+  card_number: string
+  operation: string
+  amount: number
+  trips_delta: number
+  approved?: boolean
+  reason?: string
+  created_at: string
+}
+
 export interface UserEntity {
   id: number
   login: string

@@ -25,3 +25,29 @@ docker compose up --build
 ```bash
 cd backend && go build -o server ./cmd/server
 ```
+
+## ЛР4 — Flutter-терминал NFC (macOS)
+
+Приложение в каталоге [`terminal`](terminal/README.md):
+
+- **Flutter macOS** + нативный **C**: libnfc, MIFARE Classic (данные в блоках 4–6 и 8–10), **AES-128-ECB** на каждый 16-байтный блок, JSON на карте: `{ v, card_number, balance, trips, key_id }`.
+- Расширение API ЛР2: `POST /api/v1/terminal/event`, `GET /api/v1/terminal/events`; каждый вызов `POST /terminal/authorize` сохраняется в `terminal_events`.
+- Страница **Терминалы** в SPA показывает **журнал** с опросом раз в ~2 с.
+
+Подготовка (Homebrew, Apple Silicon; на Intel см. префикс в [`terminal/macos/Runner/Configs/NfcNative.xcconfig`](terminal/macos/Runner/Configs/NfcNative.xcconfig)):
+
+```bash
+brew install libnfc openssl@3
+```
+
+На машине с установленным **Xcode** или **Command Line Tools** (`xcodebuild` в PATH):
+
+```bash
+cd terminal && flutter pub get && flutter run -d macos
+```
+
+Если видите `unable to find utility "xcodebuild"` — см. раздел устранения в [`terminal/README.md`](terminal/README.md).
+
+По умолчанию приложение ходит в `https://127.0.0.1:8888/api/v1` и принимает self-signed TLS. После операций админ может увидеть события в журнале.
+
+**Приёмка:** `docker compose up`, «Записать карту» в приложении; баланс карты на чипе и в админке для демонстрации `authorize` нужно держать **согласованными** (сервер только решает, не изменяет баланс автоматически).

@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
@@ -16,6 +17,20 @@ type terminalAuthorizeRequest struct {
 type terminalAuthorizeResponse struct {
 	Approved bool   `json:"approved"`
 	Reason   string `json:"reason"`
+}
+
+func (s Server) persistTerminalAuthorize(ctx context.Context, req terminalAuthorizeRequest, resp terminalAuthorizeResponse) {
+	approved := resp.Approved
+	reason := resp.Reason
+	_, _ = (store.TerminalEvents{DB: s.DB}).Create(ctx, store.CreateTerminalEventParams{
+		TerminalSerial: req.TerminalSerialNumber,
+		CardNumber:     req.CardNumber,
+		Operation:      "authorize",
+		Amount:         req.Amount,
+		TripsDelta:     0,
+		Approved:       &approved,
+		Reason:         &reason,
+	})
 }
 
 // handleTerminalAuthorize godoc
@@ -42,9 +57,13 @@ func (s Server) handleTerminalAuthorize(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	resp := terminalAuthorizeResponse{Approved: false, Reason: "internal"}
+
 	if _, err := (store.Terminals{DB: s.DB}).GetBySerialNumber(r.Context(), req.TerminalSerialNumber); err != nil {
 		if err == store.ErrNotFound {
-			writeJSON(w, http.StatusOK, terminalAuthorizeResponse{Approved: false, Reason: "terminal_not_found"})
+			resp = terminalAuthorizeResponse{Approved: false, Reason: "terminal_not_found"}
+			s.persistTerminalAuthorize(r.Context(), req, resp)
+			writeJSON(w, http.StatusOK, resp)
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "internal", "database error")
@@ -54,7 +73,9 @@ func (s Server) handleTerminalAuthorize(w http.ResponseWriter, r *http.Request) 
 	card, err := (store.Cards{DB: s.DB}).GetByCardNumber(r.Context(), req.CardNumber)
 	if err != nil {
 		if err == store.ErrNotFound {
-			writeJSON(w, http.StatusOK, terminalAuthorizeResponse{Approved: false, Reason: "card_not_found"})
+			resp = terminalAuthorizeResponse{Approved: false, Reason: "card_not_found"}
+			s.persistTerminalAuthorize(r.Context(), req, resp)
+			writeJSON(w, http.StatusOK, resp)
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "internal", "database error")
@@ -62,15 +83,15 @@ func (s Server) handleTerminalAuthorize(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if card.IsBlocked {
-		writeJSON(w, http.StatusOK, terminalAuthorizeResponse{Approved: false, Reason: "card_blocked"})
-		return
-	}
-	if card.Balance < req.Amount {
-		writeJSON(w, http.StatusOK, terminalAuthorizeResponse{Approved: false, Reason: "insufficient_funds"})
-		return
+		resp = terminalAuthorizeResponse{Approved: false, Reason: "card_blocked"}
+	} else if card.Balance < req.Amount {
+		resp = terminalAuthorizeResponse{Approved: false, Reason: "insufficient_funds"}
+	} else {
+		resp = terminalAuthorizeResponse{Approved: true, Reason: "ok"}
 	}
 
-	writeJSON(w, http.StatusOK, terminalAuthorizeResponse{Approved: true, Reason: "ok"})
+	s.persistTerminalAuthorize(r.Context(), req, resp)
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // handleTerminalKeys godoc
@@ -92,4 +113,3 @@ func (s Server) handleTerminalKeys(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, out)
 }
-

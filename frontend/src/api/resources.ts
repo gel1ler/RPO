@@ -1,6 +1,7 @@
 import { api } from './client'
 import type {
   Terminal,
+  TerminalEvent,
   KeyEntity,
   CardEntity,
   TransactionEntity,
@@ -35,6 +36,15 @@ export async function updateTerminal(
 
 export async function deleteTerminal(id: number): Promise<void> {
   return api(`/terminals/${id}`, { method: 'DELETE' })
+}
+
+export async function listTerminalEvents(
+  since = 0,
+  limit = 100,
+): Promise<{ items: TerminalEvent[] }> {
+  return api<{ items: TerminalEvent[] }>(
+    `/terminal/events?since=${encodeURIComponent(String(since))}&limit=${encodeURIComponent(String(limit))}`,
+  )
 }
 
 /** Keys (admin) */

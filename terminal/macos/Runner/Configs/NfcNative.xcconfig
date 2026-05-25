@@ -1,0 +1,7 @@
+/* Homebrew ARM64; Intel: /usr/local/opt/... — поменять при нужде */
+LIBNFC_PREFIX = /opt/homebrew/opt/libnfc
+OPENSSL_PREFIX = /opt/homebrew/opt/openssl@3
+
+HEADER_SEARCH_PATHS = $(inherited) $(LIBNFC_PREFIX)/include $(OPENSSL_PREFIX)/include
+LIBRARY_SEARCH_PATHS = $(inherited) $(LIBNFC_PREFIX)/lib $(OPENSSL_PREFIX)/lib
+OTHER_LDFLAGS = $(inherited) -lnfc -lssl -lcrypto

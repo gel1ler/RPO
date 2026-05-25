@@ -41,6 +41,7 @@ func (s Server) Router() http.Handler {
 	// terminal API (no auth)
 	mux.Handle("POST /api/v1/terminal/authorize", http.HandlerFunc(s.handleTerminalAuthorize))
 	mux.Handle("GET /api/v1/terminal/keys", http.HandlerFunc(s.handleTerminalKeys))
+	mux.Handle("POST /api/v1/terminal/event", http.HandlerFunc(s.handleTerminalEventPost))
 
 	authed := func(h http.HandlerFunc) http.Handler {
 		return requireAuth(s.JWT, h)
@@ -76,6 +77,8 @@ func (s Server) Router() http.Handler {
 	mux.Handle("GET /api/v1/transactions/{id}", authed(s.handleTransactionsGet))
 	mux.Handle("PUT /api/v1/transactions/{id}", authed(s.handleTransactionsUpdate))
 	mux.Handle("DELETE /api/v1/transactions/{id}", authed(s.handleTransactionsDelete))
+
+	mux.Handle("GET /api/v1/terminal/events", authed(s.handleTerminalEventsSince))
 
 	// users
 	mux.Handle("GET /api/v1/users", adminOnly(s.handleUsersList))
