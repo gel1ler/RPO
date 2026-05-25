@@ -1,0 +1,1263 @@
+basePath: /api/v1
+definitions:
+  internal_httpapi.SwaggerAuthLoginRequest:
+    properties:
+      login:
+        type: string
+      password:
+        type: string
+    type: object
+  internal_httpapi.SwaggerAuthLoginResponse:
+    properties:
+      token:
+        type: string
+    type: object
+  internal_httpapi.SwaggerCardDTO:
+    properties:
+      balance:
+        type: integer
+      card_number:
+        type: string
+      created_at:
+        type: string
+      extra:
+        type: string
+      id:
+        type: integer
+      is_blocked:
+        type: boolean
+      key_id:
+        type: integer
+      owner_name:
+        type: string
+    type: object
+  internal_httpapi.SwaggerCreateCardRequest:
+    properties:
+      balance:
+        type: integer
+      card_number:
+        type: string
+      extra:
+        type: string
+      is_blocked:
+        type: boolean
+      key_id:
+        type: integer
+      owner_name:
+        type: string
+    type: object
+  internal_httpapi.SwaggerCreateKeyRequest:
+    properties:
+      key_value:
+        type: string
+      label:
+        type: string
+    type: object
+  internal_httpapi.SwaggerCreateTerminalRequest:
+    properties:
+      address:
+        type: string
+      extra:
+        type: string
+      name:
+        type: string
+      serial_number:
+        type: string
+    type: object
+  internal_httpapi.SwaggerCreateTransactionRequest:
+    properties:
+      amount:
+        type: integer
+      card_id:
+        type: integer
+      terminal_id:
+        type: integer
+    type: object
+  internal_httpapi.SwaggerCreateUserRequest:
+    properties:
+      display_name:
+        type: string
+      is_admin:
+        type: boolean
+      login:
+        type: string
+      password:
+        type: string
+    type: object
+  internal_httpapi.SwaggerErrorResponse:
+    properties:
+      error:
+        type: string
+      message:
+        type: string
+    type: object
+  internal_httpapi.SwaggerKeyDTO:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      key_value:
+        type: string
+      label:
+        type: string
+    type: object
+  internal_httpapi.SwaggerMeResponse:
+    properties:
+      created_at:
+        type: string
+      display_name:
+        type: string
+      id:
+        type: integer
+      is_admin:
+        type: boolean
+      login:
+        type: string
+    type: object
+  internal_httpapi.SwaggerTerminalAuthorizeRequest:
+    properties:
+      amount:
+        type: integer
+      card_number:
+        type: string
+      terminal_serial_number:
+        type: string
+    type: object
+  internal_httpapi.SwaggerTerminalAuthorizeResponse:
+    properties:
+      approved:
+        type: boolean
+      reason:
+        type: string
+    type: object
+  internal_httpapi.SwaggerTerminalDTO:
+    properties:
+      address:
+        type: string
+      created_at:
+        type: string
+      extra:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      serial_number:
+        type: string
+    type: object
+  internal_httpapi.SwaggerTransactionDTO:
+    properties:
+      amount:
+        type: integer
+      card_id:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: integer
+      terminal_id:
+        type: integer
+    type: object
+  internal_httpapi.SwaggerUpdateCardRequest:
+    properties:
+      balance:
+        type: integer
+      extra:
+        type: string
+      is_blocked:
+        type: boolean
+      key_id:
+        type: integer
+      owner_name:
+        type: string
+    type: object
+  internal_httpapi.SwaggerUpdateKeyRequest:
+    properties:
+      key_value:
+        type: string
+      label:
+        type: string
+    type: object
+  internal_httpapi.SwaggerUpdateTerminalRequest:
+    properties:
+      address:
+        type: string
+      extra:
+        type: string
+      name:
+        type: string
+    type: object
+  internal_httpapi.SwaggerUpdateTransactionRequest:
+    properties:
+      amount:
+        type: integer
+      card_id:
+        type: integer
+      terminal_id:
+        type: integer
+    type: object
+  internal_httpapi.SwaggerUpdateUserRequest:
+    properties:
+      display_name:
+        type: string
+      is_admin:
+        type: boolean
+      password:
+        type: string
+    type: object
+  internal_httpapi.SwaggerUserDTO:
+    properties:
+      created_at:
+        type: string
+      display_name:
+        type: string
+      id:
+        type: integer
+      is_admin:
+        type: boolean
+      login:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: REST API сервера авторизации платежей транспортными картами.
+  title: RPO Authorization API
+  version: "1.0"
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Returns JWT token
+      parameters:
+      - description: Credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_httpapi.SwaggerAuthLoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerAuthLoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      summary: Login with password
+      tags:
+      - auth
+  /cards:
+    get:
+      parameters:
+      - description: Limit
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_httpapi.SwaggerCardDTO'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List cards
+      tags:
+      - cards
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Card
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_httpapi.SwaggerCreateCardRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerCardDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create card
+      tags:
+      - cards
+  /cards/{id}:
+    delete:
+      parameters:
+      - description: Card ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete card
+      tags:
+      - cards
+    get:
+      parameters:
+      - description: Card ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerCardDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get card
+      tags:
+      - cards
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Card ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Card
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_httpapi.SwaggerUpdateCardRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerCardDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update card
+      tags:
+      - cards
+  /keys:
+    get:
+      parameters:
+      - description: Limit
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_httpapi.SwaggerKeyDTO'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List keys
+      tags:
+      - keys
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Key
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_httpapi.SwaggerCreateKeyRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerKeyDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create key
+      tags:
+      - keys
+  /keys/{id}:
+    delete:
+      parameters:
+      - description: Key ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete key
+      tags:
+      - keys
+    get:
+      parameters:
+      - description: Key ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerKeyDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get key
+      tags:
+      - keys
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Key ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Key
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_httpapi.SwaggerUpdateKeyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerKeyDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update key
+      tags:
+      - keys
+  /me:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerMeResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Current user
+      tags:
+      - auth
+  /terminal/authorize:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Authorization request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_httpapi.SwaggerTerminalAuthorizeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerTerminalAuthorizeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      summary: Authorize payment transaction (decision only)
+      tags:
+      - terminal
+  /terminal/keys:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_httpapi.SwaggerKeyDTO'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      summary: Load keys for terminals
+      tags:
+      - terminal
+  /terminals:
+    get:
+      parameters:
+      - description: Limit
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_httpapi.SwaggerTerminalDTO'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List terminals
+      tags:
+      - terminals
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Terminal
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_httpapi.SwaggerCreateTerminalRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerTerminalDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create terminal
+      tags:
+      - terminals
+  /terminals/{id}:
+    delete:
+      parameters:
+      - description: Terminal ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete terminal
+      tags:
+      - terminals
+    get:
+      parameters:
+      - description: Terminal ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerTerminalDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get terminal
+      tags:
+      - terminals
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Terminal ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Terminal
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_httpapi.SwaggerUpdateTerminalRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerTerminalDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update terminal
+      tags:
+      - terminals
+  /transactions:
+    get:
+      parameters:
+      - description: Limit
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_httpapi.SwaggerTransactionDTO'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List transactions
+      tags:
+      - transactions
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Transaction
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_httpapi.SwaggerCreateTransactionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerTransactionDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create transaction
+      tags:
+      - transactions
+  /transactions/{id}:
+    delete:
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete transaction
+      tags:
+      - transactions
+    get:
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerTransactionDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get transaction
+      tags:
+      - transactions
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Transaction
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_httpapi.SwaggerUpdateTransactionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerTransactionDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update transaction
+      tags:
+      - transactions
+  /users:
+    get:
+      parameters:
+      - description: Limit
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_httpapi.SwaggerUserDTO'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List users
+      tags:
+      - users
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: User
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_httpapi.SwaggerCreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerUserDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create user
+      tags:
+      - users
+  /users/{id}:
+    delete:
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete user
+      tags:
+      - users
+    get:
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerUserDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get user
+      tags:
+      - users
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: User
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_httpapi.SwaggerUpdateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerUserDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_httpapi.SwaggerErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update user
+      tags:
+      - users
+schemes:
+- https
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

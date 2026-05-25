@@ -1,22 +1,31 @@
-FROM golang:1.22-bookworm AS build
+FROM node:22-alpine AS frontend
+
+WORKDIR /app
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY frontend/ ./
+RUN npm run build
+
+FROM golang:1.25-bookworm AS backend
 
 WORKDIR /src
-COPY go.mod go.sum ./
+COPY backend/go.mod backend/go.sum ./
 RUN go mod download
-COPY . .
+COPY backend/ ./
 RUN CGO_ENABLED=0 go build -o /out/server ./cmd/server
 
 FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends nginx ca-certificates openssl \
     && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /etc/nginx/certs \
+    && mkdir -p /etc/nginx/certs /var/www/html \
     && openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
         -keyout /etc/nginx/certs/server.key \
         -out /etc/nginx/certs/server.crt \
         -subj "/CN=localhost"
 
-COPY --from=build /out/server /usr/local/bin/server
+COPY --from=backend /out/server /usr/local/bin/server
+COPY --from=frontend /app/dist /var/www/html
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh

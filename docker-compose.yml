@@ -1,7 +1,10 @@
 services:
-  api:
+  app:
     build: .
     ports:
       - "8888:8888"
+    environment:
+      APP_ADMIN_LOGIN: admin
+      APP_ADMIN_PASSWORD: admin
     volumes:
       - ./data:/data
