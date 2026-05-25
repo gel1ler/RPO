@@ -5,12 +5,21 @@
 Требования: **Xcode из App Store** или **Apple Command Line Tools**, Flutter с поддержкой desktop macOS.
 
 ```bash
-brew install libnfc openssl@3   # см. xcconfig префикс Homebrew
+brew install libnfc openssl@3
+```
+
+Проверьте, что каталоги существуют (иначе не найдётся `nfc/nfc.h`):
+
+```bash
+ls "$(brew --prefix libnfc)/include/nfc/nfc.h"
+```
+
+По умолчанию в `NfcNative.xcconfig` заданы пути **Apple Silicon** (`/opt/homebrew/opt/...`). На **Intel Homebrew** добавьте в `HEADER_SEARCH_PATHS` и `LIBRARY_SEARCH_PATHS` каталоги `/usr/local/opt/libnfc/...` и `/usr/local/opt/openssl@3/...` (см. комментарий в файле).
+
+```bash
 flutter pub get
 flutter run -d macos
 ```
-
-Если сборка жалуется на пути `-lnfc` / OpenSSL — отредактируйте префиксы в `macos/Runner/Configs/NfcNative.xcconfig` под вашу платформу (ARM64 → `/opt/homebrew`, Intel → `/usr/local`).
 
 Проект добавляет два **.c**-файла в Runner: `nfc_card.c` (чтение/запись, AES блоков), `mifare_compat.c` — обёртка `nfc_initiator_mifare_cmd` из утилит libnfc.
 
@@ -18,14 +27,14 @@ flutter run -d macos
 
 Flutter для **macOS** всегда вызывает Xcode (Swift Package Manager в Runner и т.д.). Нужно:
 
-1. Установить один из вариантов:
-   - полный **Xcode** из App Store; первый запуск — открыть Xcode и принять лицензию;
-   - либо только инструменты: в терминале выполнить **`xcode-select --install`** и дождаться окончания установки.
+1. Установить **полный Xcode** из App Store; первый запуск — открыть Xcode и принять лицензию (**только** Command Line Tools без `Xcode.app` для `flutter run -d macos` недостаточно).
 
-2. Указать активный developer directory (если стоит полный Xcode):
+2. Указать активный developer directory и довести Xcode до рабочего состояния:
 
    ```bash
    sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+   sudo xcodebuild -license
+   sudo xcodebuild -runFirstLaunch
    ```
 
 3. Проверить:
@@ -34,7 +43,7 @@ Flutter для **macOS** всегда вызывает Xcode (Swift Package Mana
    xcodebuild -version
    ```
 
-4. Снова: `cd terminal && flutter doctor` (должен показать Xcode), затем `flutter run -d macos`.
+4. Снова: `cd terminal && flutter doctor`, затем `flutter run -d macos`.
 
 Без `xcodebuild` проект **не соберётся** — это ограничение платформы, а не репозитория.
 
