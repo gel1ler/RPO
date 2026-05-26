@@ -6,6 +6,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+
+#define CARD_WAIT_TIMEOUT_MS 5000
+#define CARD_POLL_INTERVAL_MS 150
 
 #define DATA_BLOCK_COUNT 6
 #define BLOCK_SIZE 16
@@ -128,13 +132,25 @@ static int encrypt_block_aes(const uint8_t aes_key[16], const uint8_t in[BLOCK_S
   return NFC_CARD_OK;
 }
 
+static void sleep_ms(unsigned ms) { usleep((useconds_t)ms * 1000); }
+
+/** Ожидание карты до CARD_WAIT_TIMEOUT_MS с периодическим опросом. */
 static int select_card(nfc_device *dev, nfc_target *nt) {
   const nfc_modulation nm = {.nmt = NMT_ISO14443A, .nbr = NBR_106};
-  if (nfc_initiator_select_passive_target(dev, nm, NULL, 0, nt) <= 0) {
-    set_error("no card on reader");
-    return NFC_CARD_ERR;
+  unsigned elapsed = 0;
+
+  while (1) {
+    if (nfc_initiator_select_passive_target(dev, nm, NULL, 0, nt) > 0) {
+      return NFC_CARD_OK;
+    }
+    if (elapsed >= CARD_WAIT_TIMEOUT_MS) {
+      break;
+    }
+    sleep_ms(CARD_POLL_INTERVAL_MS);
+    elapsed += CARD_POLL_INTERVAL_MS;
   }
-  return NFC_CARD_OK;
+  set_error("no card on reader (waited 5s)");
+  return NFC_CARD_ERR;
 }
 
 static void format_uid(const nfc_target *nt, char *uid_out, size_t uid_len) {

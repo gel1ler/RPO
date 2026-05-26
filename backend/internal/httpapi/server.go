@@ -42,6 +42,7 @@ func (s Server) Router() http.Handler {
 	mux.Handle("POST /api/v1/terminal/authorize", http.HandlerFunc(s.handleTerminalAuthorize))
 	mux.Handle("GET /api/v1/terminal/keys", http.HandlerFunc(s.handleTerminalKeys))
 	mux.Handle("POST /api/v1/terminal/event", http.HandlerFunc(s.handleTerminalEventPost))
+	mux.Handle("POST /api/v1/terminal/register-card", http.HandlerFunc(s.handleTerminalRegisterCard))
 
 	authed := func(h http.HandlerFunc) http.Handler {
 		return requireAuth(s.JWT, h)

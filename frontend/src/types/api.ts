@@ -54,7 +54,6 @@ export interface TerminalEvent {
   card_number: string
   operation: string
   amount: number
-  trips_delta: number
   approved?: boolean
   reason?: string
   created_at: string

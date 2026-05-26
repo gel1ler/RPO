@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:ffi' as ffi;
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:ffi/ffi.dart';
 
@@ -107,5 +108,19 @@ class NfcBridge {
       calloc.free(keyPtr);
       calloc.free(jsonPtr);
     }
+  }
+
+  /// NFC в фоне — UI остаётся отзывчивым, анимация ожидания карты идёт на main isolate.
+  static Future<({String uid, String json})> readCardPayloadAsync(
+    String mifareKeyHex,
+  ) {
+    return Isolate.run(() => readCardPayload(mifareKeyHex));
+  }
+
+  static Future<void> writeCardPayloadAsync(
+    String mifareKeyHex,
+    String json,
+  ) {
+    return Isolate.run(() => writeCardPayload(mifareKeyHex, json));
   }
 }

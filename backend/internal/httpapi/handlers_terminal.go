@@ -27,7 +27,6 @@ func (s Server) persistTerminalAuthorize(ctx context.Context, req terminalAuthor
 		CardNumber:     req.CardNumber,
 		Operation:      "authorize",
 		Amount:         req.Amount,
-		TripsDelta:     0,
 		Approved:       &approved,
 		Reason:         &reason,
 	})
@@ -112,4 +111,104 @@ func (s Server) handleTerminalKeys(w http.ResponseWriter, r *http.Request) {
 		out = append(out, keyToDTO(it))
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+type terminalRegisterCardRequest struct {
+	TerminalSerialNumber string `json:"terminal_serial_number"`
+	CardNumber           string `json:"card_number"`
+	Balance              int64  `json:"balance"`
+	KeyID                int64  `json:"key_id"`
+}
+
+type terminalRegisterCardResponse struct {
+	Card    cardDTO `json:"card"`
+	Created bool    `json:"created"`
+}
+
+// handleTerminalRegisterCard — регистрация карты в БД с терминала (без JWT).
+func (s Server) handleTerminalRegisterCard(w http.ResponseWriter, r *http.Request) {
+	var req terminalRegisterCardRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", "invalid json")
+		return
+	}
+
+	req.TerminalSerialNumber = strings.TrimSpace(req.TerminalSerialNumber)
+	req.CardNumber = strings.TrimSpace(req.CardNumber)
+	if req.TerminalSerialNumber == "" || req.CardNumber == "" {
+		writeError(w, http.StatusBadRequest, "bad_request", "terminal_serial_number and card_number are required")
+		return
+	}
+	if req.Balance < 0 {
+		writeError(w, http.StatusBadRequest, "bad_request", "balance must be >= 0")
+		return
+	}
+	if req.KeyID <= 0 {
+		writeError(w, http.StatusBadRequest, "bad_request", "key_id is required")
+		return
+	}
+
+	if _, err := (store.Terminals{DB: s.DB}).GetBySerialNumber(r.Context(), req.TerminalSerialNumber); err != nil {
+		if err == store.ErrNotFound {
+			writeError(w, http.StatusBadRequest, "bad_request", "terminal_not_found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "internal", "database error")
+		return
+	}
+
+	if _, err := (store.Keys{DB: s.DB}).GetByID(r.Context(), req.KeyID); err != nil {
+		if err == store.ErrNotFound {
+			writeError(w, http.StatusBadRequest, "bad_request", "key_id not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "internal", "database error")
+		return
+	}
+
+	cards := store.Cards{DB: s.DB}
+	existing, err := cards.GetByCardNumber(r.Context(), req.CardNumber)
+	created := false
+	var card store.Card
+
+	if err != nil {
+		if err != store.ErrNotFound {
+			writeError(w, http.StatusInternalServerError, "internal", "database error")
+			return
+		}
+		card, err = cards.Create(r.Context(), store.CreateCardParams{
+			CardNumber: req.CardNumber,
+			Balance:    req.Balance,
+			IsBlocked:  false,
+			KeyID:      req.KeyID,
+		})
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "internal", "database error")
+			return
+		}
+		created = true
+	} else {
+		bal := req.Balance
+		keyID := req.KeyID
+		card, err = cards.Update(r.Context(), existing.ID, store.UpdateCardParams{
+			Balance: &bal,
+			KeyID:   &keyID,
+		})
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "internal", "database error")
+			return
+		}
+	}
+
+	_, _ = (store.TerminalEvents{DB: s.DB}).Create(r.Context(), store.CreateTerminalEventParams{
+		TerminalSerial: req.TerminalSerialNumber,
+		CardNumber:     req.CardNumber,
+		Operation:      "register_card",
+		Amount:         req.Balance,
+	})
+
+	writeJSON(w, http.StatusOK, terminalRegisterCardResponse{
+		Card:    cardToDTO(card),
+		Created: created,
+	})
 }

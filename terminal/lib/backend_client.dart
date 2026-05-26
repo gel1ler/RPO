@@ -56,6 +56,37 @@ class BackendClient {
     }
   }
 
+  /// Регистрация карты в SQLite (создание или обновление баланса/key_id).
+  Future<JsonMap> registerCard({
+    required String terminalSerial,
+    required String cardNumber,
+    required int balance,
+    required int keyId,
+  }) async {
+    final body = utf8.encode(jsonEncode({
+      'terminal_serial_number': terminalSerial,
+      'card_number': cardNumber,
+      'balance': balance,
+      'key_id': keyId,
+    }));
+
+    final c = _client();
+    try {
+      final req = await c.postUrl(_uri('/terminal/register-card'));
+      req.headers.contentType = ContentType.json;
+      req.headers.contentLength = body.length;
+      req.add(body);
+      final resp = await req.close();
+      final text = await resp.transform(utf8.decoder).join();
+      if (resp.statusCode != HttpStatus.ok) {
+        throw HttpException(text, uri: req.uri);
+      }
+      return jsonDecode(text) as JsonMap;
+    } finally {
+      c.close(force: true);
+    }
+  }
+
   Future<List<JsonMap>> loadKeys() async {
     final c = _client();
     try {

@@ -12,7 +12,6 @@ type TerminalEvent struct {
 	CardNumber       string
 	Operation        string
 	Amount           int64
-	TripsDelta       int64
 	Approved         sql.NullInt64 // NULL = не применимо; 0/1
 	Reason           sql.NullString
 	CreatedAt        string
@@ -23,7 +22,6 @@ type CreateTerminalEventParams struct {
 	CardNumber     string
 	Operation      string
 	Amount         int64
-	TripsDelta     int64
 	Approved       *bool
 	Reason         *string
 }
@@ -48,9 +46,9 @@ func (s TerminalEvents) Create(ctx context.Context, p CreateTerminalEventParams)
 	}
 
 	res, err := s.DB.ExecContext(ctx, `
-INSERT INTO terminal_events (terminal_serial, card_number, operation, amount, trips_delta, approved, reason)
-VALUES (?,?,?,?,?,?,?)`,
-		p.TerminalSerial, p.CardNumber, p.Operation, p.Amount, p.TripsDelta, approvedIface, reasonIface,
+INSERT INTO terminal_events (terminal_serial, card_number, operation, amount, approved, reason)
+VALUES (?,?,?,?,?,?)`,
+		p.TerminalSerial, p.CardNumber, p.Operation, p.Amount, approvedIface, reasonIface,
 	)
 	if err != nil {
 		return TerminalEvent{}, err
@@ -64,7 +62,7 @@ VALUES (?,?,?,?,?,?,?)`,
 
 func (s TerminalEvents) GetByID(ctx context.Context, id int64) (TerminalEvent, error) {
 	row := s.DB.QueryRowContext(ctx, `
-SELECT id, terminal_serial, card_number, operation, amount, trips_delta, approved, reason, created_at
+SELECT id, terminal_serial, card_number, operation, amount, approved, reason, created_at
 FROM terminal_events WHERE id = ?`, id)
 	return scanTerminalEvent(row)
 }
@@ -77,7 +75,7 @@ func (s TerminalEvents) ListSince(ctx context.Context, sinceID int64, limit int6
 		limit = 500
 	}
 	rows, err := s.DB.QueryContext(ctx, `
-SELECT id, terminal_serial, card_number, operation, amount, trips_delta, approved, reason, created_at
+SELECT id, terminal_serial, card_number, operation, amount, approved, reason, created_at
 FROM terminal_events WHERE id > ? ORDER BY id ASC LIMIT ?`, sinceID, limit)
 	if err != nil {
 		return nil, err
@@ -97,7 +95,7 @@ FROM terminal_events WHERE id > ? ORDER BY id ASC LIMIT ?`, sinceID, limit)
 
 func scanTerminalEvent(row *sql.Row) (TerminalEvent, error) {
 	var e TerminalEvent
-	err := row.Scan(&e.ID, &e.TerminalSerial, &e.CardNumber, &e.Operation, &e.Amount, &e.TripsDelta, &e.Approved, &e.Reason, &e.CreatedAt)
+	err := row.Scan(&e.ID, &e.TerminalSerial, &e.CardNumber, &e.Operation, &e.Amount, &e.Approved, &e.Reason, &e.CreatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return TerminalEvent{}, ErrNotFound
@@ -109,6 +107,6 @@ func scanTerminalEvent(row *sql.Row) (TerminalEvent, error) {
 
 func scanTerminalEventRow(rows *sql.Rows) (TerminalEvent, error) {
 	var e TerminalEvent
-	err := rows.Scan(&e.ID, &e.TerminalSerial, &e.CardNumber, &e.Operation, &e.Amount, &e.TripsDelta, &e.Approved, &e.Reason, &e.CreatedAt)
+	err := rows.Scan(&e.ID, &e.TerminalSerial, &e.CardNumber, &e.Operation, &e.Amount, &e.Approved, &e.Reason, &e.CreatedAt)
 	return e, err
 }

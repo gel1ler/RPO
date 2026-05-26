@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 
 import 'backend_client.dart';
 import 'card_payload.dart';
+import 'card_payload_view.dart';
 import 'nfc_bridge.dart';
+import 'terminal_config.dart';
 
 class TerminalScreen extends StatefulWidget {
   const TerminalScreen({super.key});
@@ -13,36 +15,163 @@ class TerminalScreen extends StatefulWidget {
   State<TerminalScreen> createState() => _TerminalScreenState();
 }
 
-class _TerminalScreenState extends State<TerminalScreen> {
-  final _baseCtrl = TextEditingController(text: 'https://127.0.0.1:8888/api/v1');
-  final _serialCtrl = TextEditingController(text: 'TERM-MAC-001');
-  final _amountCtrl = TextEditingController(text: '100');
-  final _tripsCtrl = TextEditingController(text: '1');
+class _TerminalScreenState extends State<TerminalScreen>
+    with TickerProviderStateMixin {
+  static const _cardWaitDuration = Duration(seconds: 5);
+  static const _kTabRegister = 0;
+  static const _kTabInfo = 1;
+  static const _kTabDebit = 2;
+  static const _kTabCredit = 3;
 
-  /// Номер карты по умолчанию — как в админке; для записи новой карты.
-  final _cardNoCtrl = TextEditingController(text: '1DFC7D05');
+  final _initBalanceCtrl = TextEditingController(text: '1000');
+  final _debitAmountCtrl = TextEditingController(text: '100');
+  final _creditAmountCtrl = TextEditingController(text: '100');
 
-  /// Key A hex с админки (12 символов).
-  final _mfKeyHexCtrl = TextEditingController(text: 'FFFFFFFFFFFF');
+  final _api = BackendClient(
+    baseUrl: TerminalConfig.apiBaseUrl,
+    allowBadCertificate: true,
+  );
+
+  late final TabController _tabController;
+  late final AnimationController _cardWaitController;
 
   String _status = 'Готово.';
-  bool _nfcBusy = false;
-  CardPayload? _lastPayload;
-  String _lastUid = '';
+  bool _cardWaitVisible = false;
+  String? _busyOperation;
+  bool _readerPresent = false;
+  CardPayload? _displayedPayload;
+  int? _cardShownOnTab;
   Map<int, String> _keysById = {};
-  List<Map<String, dynamic>> _keysList = [];
+  String? _keysLoadError;
 
-  BackendClient _api() =>
-      BackendClient(baseUrl: _baseCtrl.text.trim(), allowBadCertificate: true);
+  @override
+  void dispose() {
+    _tabController.removeListener(_onTabChanged);
+    _tabController.dispose();
+    _cardWaitController.dispose();
+    _initBalanceCtrl.dispose();
+    _debitAmountCtrl.dispose();
+    _creditAmountCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 4, vsync: this);
+    _tabController.addListener(_onTabChanged);
+    _cardWaitController = AnimationController(
+      vsync: this,
+      duration: _cardWaitDuration,
+    )..addListener(() {
+        if (_cardWaitVisible && mounted) setState(() {});
+      });
+    _refreshReaderStatus();
+    _loadKeysQuietly();
+  }
+
+  void _onTabChanged() {
+    if (_tabController.indexIsChanging) return;
+    _hideCardInfo();
+  }
+
+  void _hideCardInfo() {
+    if (_displayedPayload == null && _cardShownOnTab == null) return;
+    setState(() {
+      _displayedPayload = null;
+      _cardShownOnTab = null;
+    });
+  }
+
+  void _revealCardInfo(CardPayload payload) {
+    setState(() {
+      _displayedPayload = payload;
+      _cardShownOnTab = _tabController.index;
+    });
+  }
+
+  void _refreshReaderStatus() {
+    if (!Platform.isMacOS) return;
+    setState(() => _readerPresent = NfcBridge.readerPresent());
+  }
+
+  Future<void> _loadKeysQuietly() async {
+    try {
+      final keys = await _api.loadKeys();
+      final map = <int, String>{};
+      for (final raw in keys) {
+        final id = (raw['id'] as num).toInt();
+        map[id] = (raw['key_value'] as String? ?? '').trim();
+      }
+      if (!mounted) return;
+      setState(() {
+        _keysById = map;
+        _keysLoadError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _keysLoadError = e.toString());
+    }
+  }
+
+  String _extractMifareHex(String keyValue) {
+    final onlyHex = keyValue.replaceAll(RegExp(r'[^0-9A-Fa-f]'), '');
+    if (onlyHex.length >= 12) {
+      return onlyHex.substring(onlyHex.length - 12).toUpperCase();
+    }
+    return TerminalConfig.defaultMifareKeyHex;
+  }
+
+  String get _defaultMifareKeyHex {
+    if (_keysById.isEmpty) return TerminalConfig.defaultMifareKeyHex;
+    return _extractMifareHex(_keysById[_keysById.keys.first]!);
+  }
+
+  int get _defaultKeyId =>
+      _keysById.keys.isEmpty ? 1 : _keysById.keys.first;
+
+  String _mifareKeyForPayload(CardPayload p) {
+    final raw = _keysById[p.keyId];
+    if (raw != null && raw.isNotEmpty) {
+      return _extractMifareHex(raw);
+    }
+    return _defaultMifareKeyHex;
+  }
+
+  String _requireMifareKeyHex() {
+    final hex = _defaultMifareKeyHex.replaceAll(RegExp(r'\s'), '');
+    if (hex.length != 12) {
+      throw StateError(
+          'MIFARE key: нужно 12 hex-символов (проверьте ключи на сервере)');
+    }
+    return hex;
+  }
 
   void _toast(String msg) {
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  /// Ожидание карты (до 5 с в C) + анимированная шкала на UI.
+  Future<T> _duringCardWait<T>(Future<T> Function() nfc) async {
+    setState(() => _cardWaitVisible = true);
+    _cardWaitController.reset();
+    final animation = _cardWaitController.forward();
+    try {
+      return await nfc();
+    } finally {
+      if (mounted) {
+        setState(() => _cardWaitVisible = false);
+        _cardWaitController.stop();
+        _cardWaitController.reset();
+      }
+      await animation.catchError((_) {});
+    }
+  }
+
   Future<void> _run(String label, Future<void> Function() action) async {
     setState(() {
-      _nfcBusy = true;
-      _status = label;
+      _busyOperation = label;
+      _status = '$label — приложите карту к ридеру';
     });
     try {
       await action();
@@ -54,92 +183,87 @@ class _TerminalScreenState extends State<TerminalScreen> {
       _toast('$label: $e');
       setState(() => _status = e.toString());
     } finally {
-      if (mounted) setState(() => _nfcBusy = false);
+      if (mounted) {
+        setState(() => _busyOperation = null);
+        _refreshReaderStatus();
+      }
     }
-  }
-
-  Future<void> _loadKeys() async {
-    final keys = await _api().loadKeys();
-    final map = <int, String>{};
-    final list = <Map<String, dynamic>>[];
-    for (final raw in keys) {
-      final id = (raw['id'] as num).toInt();
-      final kv = raw['key_value'] as String? ?? '';
-      map[id] = kv.trim();
-      list.add(raw);
-    }
-    setState(() {
-      _keysById = map;
-      _keysList = list;
-      _status = 'Загружено ключей: ${keys.length}';
-    });
-  }
-
-  String _mifareKeyForPayload(CardPayload p) {
-    final hex = _keysById[p.keyId] ?? _mfKeyHexCtrl.text.trim();
-    return hex.trim();
   }
 
   Future<void> _readBalance() async {
     await _run('Считать карту', () async {
-      final keyHex = _mfKeyHexCtrl.text.trim().replaceAll(RegExp(r'\s'), '');
-      if (keyHex.length != 12) {
-        throw StateError('MIFARE key: нужно ровно 12 hex-символов');
-      }
-      final r = NfcBridge.readCardPayload(keyHex.toUpperCase());
+      final keyHex = _requireMifareKeyHex();
+      final r = await _duringCardWait(
+        () => NfcBridge.readCardPayloadAsync(keyHex),
+      );
       final txt = r.json.trim().isEmpty ? '{}' : r.json;
       final p = CardPayload.parse(txt);
-      setState(() {
-        _lastUid = r.uid;
-        _lastPayload = p;
-        _status =
-            'UID ${r.uid}: balance=${p.balance}, trips=${p.trips}, key_id=${p.keyId}';
-      });
+      setState(() => _status =
+          'Карта ${p.cardNumber.isNotEmpty ? p.cardNumber : r.uid}: balance=${p.balance}');
+      _revealCardInfo(p);
     });
   }
 
   Future<void> _initCardDefault() async {
-    await _run('Инициализация карты', () async {
-      final kid = _keysById.keys.isEmpty ? 1 : _keysById.keys.first;
-      final keyHex = (_keysById[kid] ?? _mfKeyHexCtrl.text.trim())
-          .trim()
-          .replaceAll(RegExp(r'\s'), '')
-          .toUpperCase();
+    await _run('Регистрация карты', () async {
+      final keyHex = _requireMifareKeyHex();
+      final snap = await _duringCardWait(
+        () => NfcBridge.readCardPayloadAsync(keyHex),
+      );
+      if (snap.uid.isEmpty) {
+        throw StateError('Не удалось прочитать UID — приложите карту');
+      }
+      final kid = _defaultKeyId;
       final p = CardPayload(
         v: 1,
-        cardNumber: _cardNoCtrl.text.trim().toUpperCase(),
-        balance: int.tryParse(_amountCtrl.text) ?? 1000,
-        trips: int.tryParse(_tripsCtrl.text) ?? 0,
+        cardNumber: snap.uid,
+        balance: int.tryParse(_initBalanceCtrl.text) ?? 1000,
         keyId: kid,
       );
-      NfcBridge.writeCardPayload(keyHex, p.toJsonString());
-      final r = NfcBridge.readCardPayload(keyHex);
+      await _duringCardWait(
+        () => NfcBridge.writeCardPayloadAsync(keyHex, p.toJsonString()),
+      );
+      final r = await _duringCardWait(
+        () => NfcBridge.readCardPayloadAsync(keyHex),
+      );
       final readBack =
           CardPayload.parse(r.json.trim().isEmpty ? '{}' : r.json);
-      setState(() {
-        _lastUid = r.uid;
-        _lastPayload = readBack;
-        _mfKeyHexCtrl.text = keyHex;
-      });
+
+      final backend = await _api.registerCard(
+        terminalSerial: TerminalConfig.serialNumber,
+        cardNumber: readBack.cardNumber,
+        balance: readBack.balance,
+        keyId: readBack.keyId,
+      );
+      final created = backend['created'] == true;
+      final card = backend['card'] as Map<String, dynamic>?;
+      final dbId = card?['id'];
+
+      setState(() => _status = created
+          ? 'Карта записана на чип и зарегистрирована в БД (id=$dbId)'
+          : 'Карта на чипе обновлена, запись в БД синхронизирована (id=$dbId)');
+      _revealCardInfo(readBack);
     });
   }
 
   Future<void> _debitTerminal() async {
-    final amt = int.tryParse(_amountCtrl.text) ?? 0;
+    final amt = int.tryParse(_debitAmountCtrl.text) ?? 0;
     if (amt <= 0) {
-      _toast('Сумма > 0');
+      _toast('Сумма списания > 0');
       return;
     }
     await _run('Списание', () async {
-      final keyHex = _mfKeyHexCtrl.text.trim().replaceAll(RegExp(r'\s'), '').toUpperCase();
-      final snap = NfcBridge.readCardPayload(keyHex);
+      final keyHex = _requireMifareKeyHex();
+      final snap = await _duringCardWait(
+        () => NfcBridge.readCardPayloadAsync(keyHex),
+      );
       final txt = snap.json.trim().isEmpty ? '{}' : snap.json;
       final payload = CardPayload.parse(txt);
       if (payload.cardNumber.trim().isEmpty) {
-        throw StateError('Сначала выполните «Инициализировать карту»');
+        throw StateError('Сначала зарегистрируйте карту');
       }
-      final resp = await _api().authorize(
-        terminalSerial: _serialCtrl.text.trim(),
+      final resp = await _api.authorize(
+        terminalSerial: TerminalConfig.serialNumber,
         cardNumber: payload.cardNumber,
         amount: amt,
       );
@@ -150,212 +274,308 @@ class _TerminalScreenState extends State<TerminalScreen> {
       }
       if (payload.balance < amt) {
         throw StateError(
-            'На карте меньше, чем нужно списать (выставьте баланс карты как в SQLite).');
+            'На карте меньше, чем нужно списать (согласуйте баланс с записью в админке).');
       }
       payload.balance -= amt;
-      NfcBridge.writeCardPayload(
-          _mifareKeyForPayload(payload).replaceAll(RegExp(r'\s'), '').toUpperCase(),
-          payload.toJsonString());
-      await _api().postTerminalEvent({
-        'terminal_serial_number': _serialCtrl.text.trim(),
+      await _duringCardWait(
+        () => NfcBridge.writeCardPayloadAsync(
+          _mifareKeyForPayload(payload),
+          payload.toJsonString(),
+        ),
+      );
+      await _api.postTerminalEvent({
+        'terminal_serial_number': TerminalConfig.serialNumber,
         'card_number': payload.cardNumber,
         'operation': 'debit_card',
         'amount': amt,
-        'trips_delta': 0,
       });
-      setState(() {
-        _lastPayload = payload;
-        _lastUid = snap.uid;
-        _status = 'Списано $amt, balance на карте=${payload.balance}';
-      });
+      setState(() => _status = 'Списано $amt, balance на карте=${payload.balance}');
+      _revealCardInfo(payload);
     });
   }
 
   Future<void> _creditMoney() async {
-    final amt = int.tryParse(_amountCtrl.text) ?? 0;
+    final amt = int.tryParse(_creditAmountCtrl.text) ?? 0;
     if (amt <= 0) {
-      _toast('Сумма > 0');
+      _toast('Сумма пополнения > 0');
       return;
     }
-    await _run('Пополнение счёта', () async {
-      final keyHex = _mfKeyHexCtrl.text.trim().replaceAll(RegExp(r'\s'), '').toUpperCase();
-      final snap = NfcBridge.readCardPayload(keyHex);
+    await _run('Пополнение', () async {
+      final keyHex = _requireMifareKeyHex();
+      final snap = await _duringCardWait(
+        () => NfcBridge.readCardPayloadAsync(keyHex),
+      );
       final txt = snap.json.trim().isEmpty ? '{}' : snap.json;
       final payload = CardPayload.parse(txt);
       if (payload.cardNumber.trim().isEmpty) {
-        throw StateError('Сначала инициализируйте карту');
+        throw StateError('Сначала зарегистрируйте карту');
       }
       payload.balance += amt;
-      NfcBridge.writeCardPayload(_mifareKeyForPayload(payload).trim().replaceAll(RegExp(r'\s'), '').toUpperCase(),
-          payload.toJsonString());
-      await _api().postTerminalEvent({
-        'terminal_serial_number': _serialCtrl.text.trim(),
+      await _duringCardWait(
+        () => NfcBridge.writeCardPayloadAsync(
+          _mifareKeyForPayload(payload),
+          payload.toJsonString(),
+        ),
+      );
+      await _api.postTerminalEvent({
+        'terminal_serial_number': TerminalConfig.serialNumber,
         'card_number': payload.cardNumber,
         'operation': 'credit_balance',
         'amount': amt,
-        'trips_delta': 0,
       });
-      setState(() {
-        _lastPayload = payload;
-        _lastUid = snap.uid;
-      });
+      setState(() => _status = 'Пополнено $amt, balance=${payload.balance}');
+      _revealCardInfo(payload);
     });
   }
 
-  Future<void> _creditTrips() async {
-    final d = int.tryParse(_tripsCtrl.text) ?? 0;
-    if (d <= 0) {
-      _toast('Поездок > 0');
-      return;
-    }
-    await _run('Пополнение поездок', () async {
-      final keyHex = _mfKeyHexCtrl.text.trim().replaceAll(RegExp(r'\s'), '').toUpperCase();
-      final snap = NfcBridge.readCardPayload(keyHex);
-      final txt = snap.json.trim().isEmpty ? '{}' : snap.json;
-      final payload = CardPayload.parse(txt);
-      if (payload.cardNumber.trim().isEmpty) {
-        throw StateError('Сначала инициализируйте карту');
-      }
-      payload.trips += d;
-      NfcBridge.writeCardPayload(_mifareKeyForPayload(payload).trim().replaceAll(RegExp(r'\s'), '').toUpperCase(),
-          payload.toJsonString());
-      await _api().postTerminalEvent({
-        'terminal_serial_number': _serialCtrl.text.trim(),
-        'card_number': payload.cardNumber,
-        'operation': 'credit_trips',
-        'amount': 0,
-        'trips_delta': d,
-      });
-      setState(() {
-        _lastPayload = payload;
-        _lastUid = snap.uid;
-      });
-    });
+  Widget _statusDot(Color color) {
+    return Container(
+      width: 10,
+      height: 10,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    );
   }
 
-  @override
-  void dispose() {
-    _baseCtrl.dispose();
-    _serialCtrl.dispose();
-    _amountCtrl.dispose();
-    _tripsCtrl.dispose();
-    _cardNoCtrl.dispose();
-    _mfKeyHexCtrl.dispose();
-    super.dispose();
+  Widget _terminalHeader(BuildContext context) {
+    final theme = Theme.of(context);
+    final readerOk = _readerPresent;
+    final readerColor = readerOk ? Colors.green : Colors.red;
+    final readerLabel = readerOk ? 'Ридер доступен' : 'Ридер недоступен';
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Text('NFC терминал', style: theme.textTheme.titleLarge),
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text('SN ${TerminalConfig.serialNumber}',
+                style: theme.textTheme.bodySmall),
+            const SizedBox(height: 2),
+            Text('Key $_defaultMifareKeyHex',
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(fontFamily: 'monospace')),
+            if (_keysLoadError != null) ...[
+              const SizedBox(height: 2),
+              Text('Ключи: ошибка загрузки',
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: theme.colorScheme.error)),
+            ],
+            const SizedBox(height: 8),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _statusDot(readerColor),
+                const SizedBox(width: 6),
+                Text(readerLabel, style: theme.textTheme.bodySmall),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
   }
 
-  @override
-  void initState() {
-    super.initState();
-    if (Platform.isMacOS) {
-      final present = NfcBridge.readerPresent();
-      _status =
-          'PN532/USB: ${present ? "ридер доступен через libnfc" : "нет устройства в списке libnfc"}';
-      setState(() {});
+  Widget _statusBlock(BuildContext context) {
+    final theme = Theme.of(context);
+    final elapsed =
+        (_cardWaitController.value * _cardWaitDuration.inMilliseconds / 1000)
+            .clamp(0.0, 5.0);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(_status, style: theme.textTheme.bodyMedium),
+        if (_cardWaitVisible) ...[
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Ожидание карты',
+                  style: theme.textTheme.labelMedium,
+                ),
+              ),
+              Text(
+                '${elapsed.toStringAsFixed(1)} / 5 с',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          LinearProgressIndicator(
+            value: _cardWaitController.value,
+            minHeight: 8,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _amountField({
+    required TextEditingController controller,
+    required String label,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: TextInputType.number,
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+      ),
+    );
+  }
+
+  Widget _tabScroll({required List<Widget> children}) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: children,
+    );
+  }
+
+  Widget _primaryButton({
+    required String label,
+    required VoidCallback? onPressed,
+    bool tonal = false,
+  }) {
+    final child = SizedBox(
+      width: double.infinity,
+      child: tonal
+          ? FilledButton.tonal(onPressed: onPressed, child: Text(label))
+          : FilledButton(onPressed: onPressed, child: Text(label)),
+    );
+    return child;
+  }
+
+  List<Widget> _cardSectionIfShown(int tabIndex) {
+    if (_cardShownOnTab != tabIndex || _displayedPayload == null) {
+      return const [];
     }
+    return [
+      const SizedBox(height: 24),
+      CardPayloadView(payload: _displayedPayload),
+    ];
+  }
+
+  Widget _tabRegister() {
+    return _tabScroll(
+      children: [
+        const Text(
+          'Запись на чип и автоматическая регистрация в БД. '
+          'Номер карты = UID приложенной карты.',
+        ),
+        const SizedBox(height: 20),
+        _amountField(
+          controller: _initBalanceCtrl,
+          label: 'Начальный баланс',
+        ),
+        const SizedBox(height: 20),
+        _primaryButton(
+          label: 'Зарегистрировать карту',
+          tonal: true,
+          onPressed: _busyOperation != null ? null : _initCardDefault,
+        ),
+        ..._cardSectionIfShown(_kTabRegister),
+      ],
+    );
+  }
+
+  Widget _tabInfo() {
+    return _tabScroll(
+      children: [
+        const Text('Считать зашифрованные данные с приложенной карты.'),
+        const SizedBox(height: 20),
+        _primaryButton(
+          label: 'Считать карту',
+          tonal: true,
+          onPressed: _busyOperation != null ? null : _readBalance,
+        ),
+        ..._cardSectionIfShown(_kTabInfo),
+      ],
+    );
+  }
+
+  Widget _tabDebit() {
+    return _tabScroll(
+      children: [
+        const Text(
+          'Списание: authorize на сервере, затем уменьшение balance на карте.',
+        ),
+        const SizedBox(height: 20),
+        _amountField(
+          controller: _debitAmountCtrl,
+          label: 'Сумма списания',
+        ),
+        const SizedBox(height: 20),
+        _primaryButton(
+          label: 'Списать',
+          onPressed: _busyOperation != null ? null : _debitTerminal,
+        ),
+        ..._cardSectionIfShown(_kTabDebit),
+      ],
+    );
+  }
+
+  Widget _tabCredit() {
+    return _tabScroll(
+      children: [
+        const Text('Пополнение баланса на карте и событие на сервер.'),
+        const SizedBox(height: 20),
+        _amountField(
+          controller: _creditAmountCtrl,
+          label: 'Сумма пополнения',
+        ),
+        const SizedBox(height: 20),
+        _primaryButton(
+          label: 'Пополнить',
+          onPressed: _busyOperation != null ? null : _creditMoney,
+        ),
+        ..._cardSectionIfShown(_kTabCredit),
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('ЛР4 — NFC терминал')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+      body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TextField(
-                controller: _baseCtrl,
-                decoration: const InputDecoration(
-                    labelText: 'HTTPS API база')),
-            TextField(
-                controller: _serialCtrl,
-                decoration:
-                    const InputDecoration(labelText: 'Серийный номер')),
-            TextField(
-                controller: _mfKeyHexCtrl,
-                decoration:
-                    const InputDecoration(labelText: 'Key A (12 hex)')),
-            TextField(
-                controller: _cardNoCtrl,
-                decoration: const InputDecoration(
-                    labelText: 'Номер карты (при записи новой карты)')),
-            TextField(
-                controller: _amountCtrl,
-                keyboardType: TextInputType.number,
-                decoration:
-                    const InputDecoration(labelText: 'Сумма операции')),
-            TextField(
-                controller: _tripsCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                    labelText: 'Δ поездок (пополнение поездок)')),
-            const Divider(height: 24),
-            Text(_status, style: Theme.of(context).textTheme.bodyMedium),
-            if (_lastUid.isNotEmpty) Text('UID: $_lastUid'),
-            if (_lastPayload != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: SelectableText(_lastPayload!.toJsonString()),
-              ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                FilledButton(
-                  onPressed: _nfcBusy ? null : _loadKeys,
-                  child: const Text('Ключи с сервера'),
-                ),
-                FilledButton.tonal(
-                  onPressed: _nfcBusy ? null : _readBalance,
-                  child: const Text('Баланс с карты'),
-                ),
-                FilledButton.tonal(
-                  onPressed: _nfcBusy ? null : _initCardDefault,
-                  child: const Text('Записать карту'),
-                ),
-                FilledButton(
-                  onPressed: _nfcBusy ? null : _debitTerminal,
-                  child: const Text('Списание'),
-                ),
-                FilledButton(
-                  onPressed: _nfcBusy ? null : _creditMoney,
-                  child: const Text('Пополнить деньги'),
-                ),
-                FilledButton(
-                  onPressed: _nfcBusy ? null : _creditTrips,
-                  child: const Text('Пополнить поездки'),
-                ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: _terminalHeader(context),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: _statusBlock(context),
+            ),
+            TabBar(
+              controller: _tabController,
+              tabs: const [
+                Tab(text: 'Регистрация'),
+                Tab(text: 'Карта'),
+                Tab(text: 'Списание'),
+                Tab(text: 'Пополнение'),
               ],
             ),
-            if (_keysList.isNotEmpty) ...[
-              const SizedBox(height: 24),
-              Text(
-                'Загруженные ключи (тап применить к полю)',
-                style: Theme.of(context).textTheme.titleSmall,
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _tabRegister(),
+                  _tabInfo(),
+                  _tabDebit(),
+                  _tabCredit(),
+                ],
               ),
-              ..._keysList.map((k) {
-                final id = k['id'];
-                final lbl = k['label'] ?? '';
-                final kv = (k['key_value'] ?? '').toString();
-                final onlyHex = kv.replaceAll(RegExp(r'[^0-9A-Fa-f]'), '');
-                return ListTile(
-                  dense: true,
-                  title: Text('$id — $lbl'),
-                  subtitle: Text(kv),
-                  onTap: () {
-                    if (onlyHex.length >= 12) {
-                      setState(() {
-                        _mfKeyHexCtrl.text = onlyHex
-                            .substring(onlyHex.length - 12)
-                            .toUpperCase();
-                      });
-                    }
-                  },
-                );
-              }),
-            ],
+            ),
           ],
         ),
       ),

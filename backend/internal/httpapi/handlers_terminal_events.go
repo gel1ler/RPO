@@ -14,7 +14,6 @@ type terminalEventDTO struct {
 	CardNumber     string  `json:"card_number"`
 	Operation      string  `json:"operation"`
 	Amount         int64   `json:"amount"`
-	TripsDelta     int64   `json:"trips_delta"`
 	Approved       *bool   `json:"approved,omitempty"`
 	Reason         *string `json:"reason,omitempty"`
 	CreatedAt      string  `json:"created_at"`
@@ -25,7 +24,6 @@ type terminalEventCreateRequest struct {
 	CardNumber           string  `json:"card_number"`
 	Operation            string  `json:"operation"`
 	Amount               int64   `json:"amount"`
-	TripsDelta           int64   `json:"trips_delta"`
 	Approved             *bool   `json:"approved"`
 	Reason               *string `json:"reason"`
 }
@@ -37,7 +35,6 @@ func terminalEventToDTO(e store.TerminalEvent) terminalEventDTO {
 		CardNumber:     e.CardNumber,
 		Operation:      e.Operation,
 		Amount:         e.Amount,
-		TripsDelta:     e.TripsDelta,
 		CreatedAt:      e.CreatedAt,
 	}
 	if e.Approved.Valid {
@@ -66,13 +63,9 @@ func (s Server) handleTerminalEventPost(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	switch req.Operation {
-	case "credit_balance", "credit_trips", "debit_card":
+	case "credit_balance", "debit_card", "register_card":
 	default:
 		writeError(w, http.StatusBadRequest, "bad_request", "unknown operation")
-		return
-	}
-	if req.Operation == "credit_trips" && req.TripsDelta <= 0 {
-		writeError(w, http.StatusBadRequest, "bad_request", "trips_delta must be > 0 for credit_trips")
 		return
 	}
 	if req.Operation == "credit_balance" && req.Amount <= 0 {
@@ -89,7 +82,6 @@ func (s Server) handleTerminalEventPost(w http.ResponseWriter, r *http.Request) 
 		CardNumber:     req.CardNumber,
 		Operation:      req.Operation,
 		Amount:         req.Amount,
-		TripsDelta:     req.TripsDelta,
 		Approved:       req.Approved,
 		Reason:         req.Reason,
 	})

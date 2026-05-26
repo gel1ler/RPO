@@ -150,14 +150,13 @@ export function TerminalsPage() {
               <TableCell>SN</TableCell>
               <TableCell>Карта</TableCell>
               <TableCell align="right">Сумма</TableCell>
-              <TableCell align="right">Поездки Δ</TableCell>
               <TableCell>ОК</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {events.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} align="center">
+                <TableCell colSpan={6} align="center">
                   Пока нет событий (появятся после работы приложения-терминала)
                 </TableCell>
               </TableRow>
@@ -172,7 +171,6 @@ export function TerminalsPage() {
                   <TableCell>{e.terminal_serial}</TableCell>
                   <TableCell>{e.card_number}</TableCell>
                   <TableCell align="right">{e.amount}</TableCell>
-                  <TableCell align="right">{e.trips_delta}</TableCell>
                   <TableCell>{fmtApprove(e)}</TableCell>
                 </TableRow>
               ))

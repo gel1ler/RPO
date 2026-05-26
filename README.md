@@ -30,8 +30,8 @@ cd backend && go build -o server ./cmd/server
 
 Приложение в каталоге [`terminal`](terminal/README.md):
 
-- **Flutter macOS** + нативный **C**: libnfc, MIFARE Classic (данные в блоках 4–6 и 8–10), **AES-128-ECB** на каждый 16-байтный блок, JSON на карте: `{ v, card_number, balance, trips, key_id }`.
-- Расширение API ЛР2: `POST /api/v1/terminal/event`, `GET /api/v1/terminal/events`; каждый вызов `POST /terminal/authorize` сохраняется в `terminal_events`.
+- **Flutter macOS** + нативный **C**: libnfc, MIFARE Classic (данные в блоках 4–6 и 8–10), **AES-128-ECB** на каждый 16-байтный блок, JSON на карте: `{ v, card_number, balance, key_id }`.
+- Расширение API ЛР2: `POST /api/v1/terminal/register-card`, `POST /api/v1/terminal/event`, `GET /api/v1/terminal/events`; каждый вызов `POST /terminal/authorize` сохраняется в `terminal_events`.
 - Страница **Терминалы** в SPA показывает **журнал** с опросом раз в ~2 с.
 
 Подготовка (Homebrew, Apple Silicon; на Intel см. префикс в [`terminal/macos/Runner/Configs/NfcNative.xcconfig`](terminal/macos/Runner/Configs/NfcNative.xcconfig)):
