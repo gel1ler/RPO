@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 #define CARD_WAIT_TIMEOUT_MS 5000
@@ -61,6 +62,13 @@ static int session_open(nfc_session_t *s) {
     s->ctx = NULL;
     return NFC_CARD_ERR;
   }
+#ifdef NP_TIMEOUT_COMMAND
+  /* Keep each low-level attempt short, so total wait budget is predictable. */
+  nfc_device_set_property_int(s->dev, NP_TIMEOUT_COMMAND, CARD_POLL_INTERVAL_MS);
+#endif
+#ifdef NP_TIMEOUT_ATR
+  nfc_device_set_property_int(s->dev, NP_TIMEOUT_ATR, CARD_POLL_INTERVAL_MS);
+#endif
   return NFC_CARD_OK;
 }
 
@@ -133,21 +141,25 @@ static int encrypt_block_aes(const uint8_t aes_key[16], const uint8_t in[BLOCK_S
 }
 
 static void sleep_ms(unsigned ms) { usleep((useconds_t)ms * 1000); }
+static long long now_ms(void) {
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return (long long)tv.tv_sec * 1000LL + (long long)tv.tv_usec / 1000LL;
+}
 
 /** Ожидание карты до CARD_WAIT_TIMEOUT_MS с периодическим опросом. */
 static int select_card(nfc_device *dev, nfc_target *nt) {
   const nfc_modulation nm = {.nmt = NMT_ISO14443A, .nbr = NBR_106};
-  unsigned elapsed = 0;
+  const long long deadline = now_ms() + CARD_WAIT_TIMEOUT_MS;
 
   while (1) {
     if (nfc_initiator_select_passive_target(dev, nm, NULL, 0, nt) > 0) {
       return NFC_CARD_OK;
     }
-    if (elapsed >= CARD_WAIT_TIMEOUT_MS) {
+    if (now_ms() >= deadline) {
       break;
     }
     sleep_ms(CARD_POLL_INTERVAL_MS);
-    elapsed += CARD_POLL_INTERVAL_MS;
   }
   set_error("no card on reader (waited 5s)");
   return NFC_CARD_ERR;
@@ -171,20 +183,37 @@ static void format_uid(const nfc_target *nt, char *uid_out, size_t uid_len) {
 
 static int mifare_auth(nfc_device *dev, const nfc_target *nt, uint8_t block,
                        const uint8_t mifare_key[6]) {
+  static const uint8_t k_default_key_a[6] = {0xff, 0xff, 0xff,
+                                             0xff, 0xff, 0xff};
   mifare_param mp;
-  memcpy(mp.mpa.abtKey, mifare_key, 6);
+  mifare_cmd auth_cmds[2] = {MC_AUTH_A, MC_AUTH_B};
+  const uint8_t *keys[2] = {mifare_key, k_default_key_a};
   if (nt->nti.nai.szUidLen >= 4) {
-    memcpy(mp.mpa.abtAuthUid,
-           nt->nti.nai.abtUid + nt->nti.nai.szUidLen - 4, 4);
+    memcpy(mp.mpa.abtAuthUid, nt->nti.nai.abtUid + nt->nti.nai.szUidLen - 4, 4);
   } else {
     set_error("unexpected uid length");
     return NFC_CARD_ERR;
   }
-  if (!nfc_initiator_mifare_cmd(dev, MC_AUTH_A, block, &mp)) {
-    set_error("mifare auth failed");
-    return NFC_CARD_ERR;
+
+  for (size_t k = 0; k < 2; k++) {
+    /* Avoid duplicate attempt if custom key is already default key. */
+    if (k == 1 && memcmp(mifare_key, k_default_key_a, sizeof(k_default_key_a)) == 0) {
+      continue;
+    }
+    memcpy(mp.mpa.abtKey, keys[k], 6);
+    for (size_t c = 0; c < 2; c++) {
+      if (nfc_initiator_mifare_cmd(dev, auth_cmds[c], block, &mp)) {
+        return NFC_CARD_OK;
+      }
+    }
   }
-  return NFC_CARD_OK;
+
+  char err[128];
+  snprintf(err, sizeof(err),
+           "mifare auth failed on block %u (A/B, custom/default key tried)",
+           block);
+  set_error(err);
+  return NFC_CARD_ERR;
 }
 
 /** Data blocks: sector1 (4–6) and sector2 (8–10), Key A on sector trailer. */
@@ -238,6 +267,26 @@ int nfc_reader_present(void) {
   size_t n = nfc_list_devices(ctx, connstrings, 8);
   nfc_exit(ctx);
   return n > 0 ? 1 : 0;
+}
+
+int nfc_read_uid(char *uid_out, size_t uid_len) {
+  nfc_session_t s;
+  if (session_open(&s) != NFC_CARD_OK) {
+    return NFC_CARD_ERR;
+  }
+
+  nfc_target nt;
+  memset(&nt, 0, sizeof(nt));
+  if (select_card(s.dev, &nt) != NFC_CARD_OK) {
+    session_close(&s);
+    return NFC_CARD_ERR;
+  }
+
+  if (uid_out && uid_len > 0) {
+    format_uid(&nt, uid_out, uid_len);
+  }
+  session_close(&s);
+  return NFC_CARD_OK;
 }
 
 int nfc_read_card(const char *mifare_key_hex, char *uid_out, size_t uid_len,

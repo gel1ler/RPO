@@ -11,6 +11,7 @@ extern "C" {
 #endif
 
 int nfc_reader_present(void);
+int nfc_read_uid(char *uid_out, size_t uid_len);
 int nfc_read_card(const char *mifare_key_hex, char *uid_out, size_t uid_len,
                   char *json_out, size_t json_len);
 int nfc_write_card(const char *mifare_key_hex, const char *json_in);

@@ -87,6 +87,21 @@ class BackendClient {
     }
   }
 
+  /// Синхронизация текущего состояния карты с БД после записи на чип.
+  Future<JsonMap> syncCardState({
+    required String terminalSerial,
+    required String cardNumber,
+    required int balance,
+    required int keyId,
+  }) {
+    return registerCard(
+      terminalSerial: terminalSerial,
+      cardNumber: cardNumber,
+      balance: balance,
+      keyId: keyId,
+    );
+  }
+
   Future<List<JsonMap>> loadKeys() async {
     final c = _client();
     try {

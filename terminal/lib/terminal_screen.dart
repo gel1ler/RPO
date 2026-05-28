@@ -155,7 +155,7 @@ class _TerminalScreenState extends State<TerminalScreen>
   Future<T> _duringCardWait<T>(Future<T> Function() nfc) async {
     setState(() => _cardWaitVisible = true);
     _cardWaitController.reset();
-    final animation = _cardWaitController.forward();
+    _cardWaitController.forward();
     try {
       return await nfc();
     } finally {
@@ -164,7 +164,6 @@ class _TerminalScreenState extends State<TerminalScreen>
         _cardWaitController.stop();
         _cardWaitController.reset();
       }
-      await animation.catchError((_) {});
     }
   }
 
@@ -190,6 +189,15 @@ class _TerminalScreenState extends State<TerminalScreen>
     }
   }
 
+  Future<void> _syncCardStateToBackend(CardPayload payload) {
+    return _api.syncCardState(
+      terminalSerial: TerminalConfig.serialNumber,
+      cardNumber: payload.cardNumber,
+      balance: payload.balance,
+      keyId: payload.keyId,
+    );
+  }
+
   Future<void> _readBalance() async {
     await _run('Считать карту', () async {
       final keyHex = _requireMifareKeyHex();
@@ -207,16 +215,16 @@ class _TerminalScreenState extends State<TerminalScreen>
   Future<void> _initCardDefault() async {
     await _run('Регистрация карты', () async {
       final keyHex = _requireMifareKeyHex();
-      final snap = await _duringCardWait(
-        () => NfcBridge.readCardPayloadAsync(keyHex),
+      final uid = await _duringCardWait(
+        NfcBridge.readUidOnlyAsync,
       );
-      if (snap.uid.isEmpty) {
+      if (uid.isEmpty) {
         throw StateError('Не удалось прочитать UID — приложите карту');
       }
       final kid = _defaultKeyId;
       final p = CardPayload(
         v: 1,
-        cardNumber: snap.uid,
+        cardNumber: uid,
         balance: int.tryParse(_initBalanceCtrl.text) ?? 1000,
         keyId: kid,
       );
@@ -283,6 +291,7 @@ class _TerminalScreenState extends State<TerminalScreen>
           payload.toJsonString(),
         ),
       );
+      await _syncCardStateToBackend(payload);
       await _api.postTerminalEvent({
         'terminal_serial_number': TerminalConfig.serialNumber,
         'card_number': payload.cardNumber,
@@ -317,6 +326,7 @@ class _TerminalScreenState extends State<TerminalScreen>
           payload.toJsonString(),
         ),
       );
+      await _syncCardStateToBackend(payload);
       await _api.postTerminalEvent({
         'terminal_serial_number': TerminalConfig.serialNumber,
         'card_number': payload.cardNumber,

@@ -48,6 +48,19 @@ class NfcBridge {
             int,
           )>();
 
+  static final _nfcReadUid = _dylib
+      .lookup<
+          ffi.NativeFunction<
+              ffi.Int32 Function(
+                ffi.Pointer<ffi.Uint8>,
+                ffi.IntPtr,
+              )>>('nfc_read_uid')
+      .asFunction<
+          int Function(
+            ffi.Pointer<ffi.Uint8>,
+            int,
+          )>();
+
   static final _nfcWriteCard = _dylib
       .lookup<
           ffi.NativeFunction<
@@ -96,6 +109,19 @@ class NfcBridge {
     }
   }
 
+  static String readUidOnly() {
+    final uidBuf = calloc<ffi.Uint8>(64);
+    try {
+      final rc = _nfcReadUid(uidBuf, 64);
+      if (rc != 0) {
+        throw FormatException(lastLibError());
+      }
+      return _peekUtf8Zeros(uidBuf, 64);
+    } finally {
+      calloc.free(uidBuf);
+    }
+  }
+
   static void writeCardPayload(String mifareKeyHex, String json) {
     final keyPtr = _allocUtf8(mifareKeyHex);
     final jsonPtr = _allocUtf8(json);
@@ -122,5 +148,9 @@ class NfcBridge {
     String json,
   ) {
     return Isolate.run(() => writeCardPayload(mifareKeyHex, json));
+  }
+
+  static Future<String> readUidOnlyAsync() {
+    return Isolate.run(readUidOnly);
   }
 }
