@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"rpo/internal/auth"
 	"rpo/internal/store"
 )
 
@@ -44,6 +45,11 @@ type createTerminalRequest struct {
 	Address      *string `json:"address"`
 	Name         *string `json:"name"`
 	Extra        *string `json:"extra"`
+}
+
+type createTerminalResponse struct {
+	terminalDTO
+	APISecret string `json:"api_secret"`
 }
 
 // handleTerminalsList godoc
@@ -96,18 +102,33 @@ func (s Server) handleTerminalsCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	apiSecret, err := auth.GenerateAPISecret()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal", "api secret generation error")
+		return
+	}
+	hash, err := auth.HashPassword(apiSecret)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal", "api secret hash error")
+		return
+	}
+
 	created, err := (store.Terminals{DB: s.DB}).Create(r.Context(), store.CreateTerminalParams{
-		SerialNumber: req.SerialNumber,
-		Address:      req.Address,
-		Name:         req.Name,
-		Extra:        req.Extra,
+		SerialNumber:  req.SerialNumber,
+		Address:       req.Address,
+		Name:          req.Name,
+		Extra:         req.Extra,
+		APISecretHash: &hash,
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal", "database error")
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, terminalToDTO(created))
+	writeJSON(w, http.StatusCreated, createTerminalResponse{
+		terminalDTO: terminalToDTO(created),
+		APISecret:   apiSecret,
+	})
 }
 
 // handleTerminalsGet godoc

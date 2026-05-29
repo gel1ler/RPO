@@ -139,7 +139,7 @@ export function TerminalsPage() {
       />
 
       <Typography variant="h6" sx={{ mt: 4, mb: 1 }}>
-        Журнал терминала (обновление ~2 сек)
+        Журнал терминала
       </Typography>
       <Paper variant="outlined" sx={{ maxHeight: 420, overflow: 'auto' }}>
         <Table size="small" stickyHeader>

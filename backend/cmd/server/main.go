@@ -9,6 +9,7 @@
 // @securityDefinitions.apikey  BearerAuth
 // @in                          header
 // @name                        Authorization
+// @description                 JWT из POST /auth/login: «Bearer &lt;token&gt;» или только &lt;token&gt;
 package main
 
 import (
@@ -71,6 +72,19 @@ func main() {
 			log.Fatalf("ensure admin: %v", err)
 		}
 		log.Printf("admin ensured: %s", adminLogin)
+	}
+
+	terminalSerial := os.Getenv("APP_TERMINAL_SERIAL")
+	terminalSecret := os.Getenv("APP_TERMINAL_API_SECRET")
+	if terminalSerial != "" && terminalSecret != "" {
+		hash, err := auth.HashPassword(terminalSecret)
+		if err != nil {
+			log.Fatalf("terminal api secret hash: %v", err)
+		}
+		if _, err := (store.Terminals{DB: db}).EnsureTerminal(context.Background(), terminalSerial, hash); err != nil {
+			log.Fatalf("ensure terminal: %v", err)
+		}
+		log.Printf("terminal ensured: %s", terminalSerial)
 	}
 
 	jwtSecret := os.Getenv("APP_JWT_SECRET")

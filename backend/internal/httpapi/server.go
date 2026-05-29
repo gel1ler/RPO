@@ -38,11 +38,15 @@ func (s Server) Router() http.Handler {
 	mux.Handle("POST /api/v1/auth/login", http.HandlerFunc(s.handleLogin))
 	mux.Handle("GET /api/v1/me", requireAuth(s.JWT, http.HandlerFunc(s.handleMe)))
 
-	// terminal API (no auth)
-	mux.Handle("POST /api/v1/terminal/authorize", http.HandlerFunc(s.handleTerminalAuthorize))
-	mux.Handle("GET /api/v1/terminal/keys", http.HandlerFunc(s.handleTerminalKeys))
-	mux.Handle("POST /api/v1/terminal/event", http.HandlerFunc(s.handleTerminalEventPost))
-	mux.Handle("POST /api/v1/terminal/register-card", http.HandlerFunc(s.handleTerminalRegisterCard))
+	mux.Handle("POST /api/v1/terminal/auth/login", http.HandlerFunc(s.handleTerminalLogin))
+
+	terminalAuthed := func(h http.HandlerFunc) http.Handler {
+		return requireTerminalAuth(s.JWT, h)
+	}
+	mux.Handle("POST /api/v1/terminal/authorize", terminalAuthed(s.handleTerminalAuthorize))
+	mux.Handle("GET /api/v1/terminal/keys", terminalAuthed(s.handleTerminalKeys))
+	mux.Handle("POST /api/v1/terminal/event", terminalAuthed(s.handleTerminalEventPost))
+	mux.Handle("POST /api/v1/terminal/register-card", terminalAuthed(s.handleTerminalRegisterCard))
 
 	authed := func(h http.HandlerFunc) http.Handler {
 		return requireAuth(s.JWT, h)

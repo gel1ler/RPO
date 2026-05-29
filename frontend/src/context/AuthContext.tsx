@@ -49,8 +49,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (loginId: string, password: string) => {
     const { token } = await apiLogin(loginId, password)
+    if (!token) {
+      throw new Error('Сервер не вернул токен')
+    }
     setToken(token)
     await refreshUser()
+    if (!getToken()) {
+      throw new Error('Сессия не установлена — проверьте ответ /me')
+    }
   }, [refreshUser])
 
   const logout = useCallback(() => {

@@ -20,12 +20,14 @@ import {
   VpnKey,
   People,
   Menu as MenuIcon,
+  Api as ApiIcon,
 } from '@mui/icons-material'
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 const drawerWidth = 220
+const swaggerUrl = '/api/v1/swagger/index.html'
 
 interface NavEntry {
   to: string
@@ -91,6 +93,30 @@ export function AppLayout() {
             {user?.login}
             {user?.is_admin ? ' (admin)' : ''}
           </Typography>
+          {user?.is_admin && (
+            <Button
+              color="inherit"
+              href={swaggerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              startIcon={<ApiIcon />}
+              sx={{ display: { xs: 'none', md: 'inline-flex' } }}
+            >
+              Swagger
+            </Button>
+          )}
+          {user?.is_admin && (
+            <IconButton
+              color="inherit"
+              href={swaggerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Swagger API"
+              sx={{ display: { xs: 'inline-flex', md: 'none' } }}
+            >
+              <ApiIcon />
+            </IconButton>
+          )}
           <Button color="inherit" onClick={logout}>
             Выход
           </Button>

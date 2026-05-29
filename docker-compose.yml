@@ -6,5 +6,7 @@ services:
     environment:
       APP_ADMIN_LOGIN: admin
       APP_ADMIN_PASSWORD: admin
+      APP_TERMINAL_SERIAL: TERM-MAC-001
+      APP_TERMINAL_API_SECRET: terminal-dev-secret
     volumes:
       - ./data:/data

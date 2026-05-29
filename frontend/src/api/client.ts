@@ -29,10 +29,6 @@ export class ApiError extends Error {
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getToken()
   const headers = new Headers(init?.headers)
-  const axiosHeaders: Record<string, string> = {}
-  headers.forEach((value, key) => {
-    axiosHeaders[key] = value
-  })
   const body = init?.body
   if (body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
@@ -41,13 +37,18 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     headers.set('Authorization', `Bearer ${token}`)
   }
 
+  const axiosHeaders: Record<string, string> = {}
+  headers.forEach((value, key) => {
+    axiosHeaders[key] = value
+  })
+
   try {
     const res = await axios.request<T>({
       url: `/api/v1${path}`,
       method: init?.method,
       headers: axiosHeaders,
       data: body,
-      signal: init?.signal,
+      signal: init?.signal ?? undefined,
       withCredentials: init?.credentials === 'include',
     })
 
@@ -55,7 +56,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
       return undefined as T
     }
 
-    return res.data
+    return res.data as T
   } catch (error) {
     if (axios.isAxiosError(error)) {
       const status = error.response?.status ?? 0

@@ -11,6 +11,8 @@ import * as api from '../api/resources'
 import { useAuth } from '../context/AuthContext'
 import type { CardEntity, KeyEntity, UserEntity } from '../types/api'
 
+const POLL_MS = 2000
+
 /** Значение для поля owner_name в БД: отображаемое имя или логин. */
 function ownerValueFromUser(u: UserEntity): string {
   const d = u.display_name?.trim()
@@ -46,8 +48,8 @@ export function CardsPage() {
   const [open, setOpen] = useState(false)
   const [editRow, setEditRow] = useState<CardEntity | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const [cards, ks, us] = await Promise.all([
         api.listCards(),
@@ -57,13 +59,22 @@ export function CardsPage() {
       setRows(cards)
       setKeys(ks)
       setUsers(us)
+    } catch {
+      /* сеть недоступна — тихий пропуск при фоновом опросе */
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [admin])
 
   useEffect(() => {
     void load()
+  }, [load])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void load(true)
+    }, POLL_MS)
+    return () => window.clearInterval(timer)
   }, [load])
 
   const ownerFieldCreate = useMemo((): FormFieldDef => {

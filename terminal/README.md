@@ -52,6 +52,10 @@ Flutter для **macOS** всегда вызывает Xcode (Swift Package Mana
 - `No available formula with the name "#"` — обычно в команду `brew install` случайно попал символ **`#`** или обрезали строку; запускайте команды без комментариев в той же строке.
 - ошибка **cask ezcast / `appcast`** — битый сторонний tap или устаревший cask; не связана с Flutter: обновите Homebrew (`brew update`) или удалите проблемный tap (`brew tap` / `brew untap ...`).
 
+## Авторизация на API
+
+При запуске приложение логинится: `POST /api/v1/terminal/auth/login` с `serial_number` и `api_secret` из `lib/terminal_config.dart` (по умолчанию совпадает с `APP_TERMINAL_API_SECRET` в `docker-compose.yml`). Полученный JWT передаётся в заголовке `Authorization` на `/terminal/authorize`, `/terminal/keys`, `/terminal/register-card`, `/terminal/event`.
+
 ## Отладка без карты
 
 `nfc_reader_present()` сообщает только о наличии устройства в списке libnfc; ошибки считывания видны после нажатия «Баланс с карты».

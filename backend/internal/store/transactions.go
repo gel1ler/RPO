@@ -6,6 +6,8 @@ import (
 	"errors"
 )
 
+var ErrInsufficientFunds = errors.New("insufficient funds")
+
 type Transaction struct {
 	ID         int64
 	Amount     int64
@@ -89,6 +91,68 @@ VALUES (?, ?, ?)
 	}
 	id, err := res.LastInsertId()
 	if err != nil {
+		return Transaction{}, err
+	}
+	return s.GetByID(ctx, id)
+}
+
+// ApplyDebit records a transaction and decreases the card balance atomically.
+func (s Transactions) ApplyDebit(ctx context.Context, cardID, terminalID, amount int64) (Transaction, error) {
+	return s.apply(ctx, cardID, terminalID, amount, false)
+}
+
+// ApplyCredit records a transaction and increases the card balance atomically.
+func (s Transactions) ApplyCredit(ctx context.Context, cardID, terminalID, amount int64) (Transaction, error) {
+	return s.apply(ctx, cardID, terminalID, amount, true)
+}
+
+func (s Transactions) apply(ctx context.Context, cardID, terminalID, amount int64, credit bool) (Transaction, error) {
+	if amount <= 0 {
+		return Transaction{}, errors.New("amount must be > 0")
+	}
+
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return Transaction{}, err
+	}
+	defer tx.Rollback()
+
+	var balance int64
+	err = tx.QueryRowContext(ctx, `SELECT balance FROM cards WHERE id = ?`, cardID).Scan(&balance)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Transaction{}, ErrNotFound
+	}
+	if err != nil {
+		return Transaction{}, err
+	}
+
+	var newBalance int64
+	if credit {
+		newBalance = balance + amount
+	} else {
+		if balance < amount {
+			return Transaction{}, ErrInsufficientFunds
+		}
+		newBalance = balance - amount
+	}
+
+	if _, err := tx.ExecContext(ctx, `UPDATE cards SET balance = ? WHERE id = ?`, newBalance, cardID); err != nil {
+		return Transaction{}, err
+	}
+
+	res, err := tx.ExecContext(ctx, `
+INSERT INTO transactions (amount, card_id, terminal_id)
+VALUES (?, ?, ?)
+`, amount, cardID, terminalID)
+	if err != nil {
+		return Transaction{}, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return Transaction{}, err
+	}
+
+	if err := tx.Commit(); err != nil {
 		return Transaction{}, err
 	}
 	return s.GetByID(ctx, id)

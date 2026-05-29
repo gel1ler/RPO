@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -48,7 +49,7 @@ func terminalEventToDTO(e store.TerminalEvent) terminalEventDTO {
 	return d
 }
 
-// handleTerminalEventPost — события с терминала (пополнение и т.п.), без JWT.
+// handleTerminalEventPost — события с терминала (пополнение и т.п.), Bearer terminal JWT.
 func (s Server) handleTerminalEventPost(w http.ResponseWriter, r *http.Request) {
 	var req terminalEventCreateRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -60,6 +61,10 @@ func (s Server) handleTerminalEventPost(w http.ResponseWriter, r *http.Request) 
 	req.Operation = strings.TrimSpace(req.Operation)
 	if req.TerminalSerialNumber == "" || req.CardNumber == "" || req.Operation == "" {
 		writeError(w, http.StatusBadRequest, "bad_request", "terminal_serial_number, card_number and operation are required")
+		return
+	}
+	if !terminalSerialMatches(r.Context(), req.TerminalSerialNumber) {
+		writeTerminalSerialMismatch(w)
 		return
 	}
 	switch req.Operation {
@@ -75,6 +80,41 @@ func (s Server) handleTerminalEventPost(w http.ResponseWriter, r *http.Request) 
 	if req.Operation == "debit_card" && req.Amount <= 0 {
 		writeError(w, http.StatusBadRequest, "bad_request", "amount must be > 0 for debit_card")
 		return
+	}
+
+	if req.Operation == "debit_card" || req.Operation == "credit_balance" {
+		terminal, err := (store.Terminals{DB: s.DB}).GetBySerialNumber(r.Context(), req.TerminalSerialNumber)
+		if err != nil {
+			if err == store.ErrNotFound {
+				writeError(w, http.StatusBadRequest, "bad_request", "terminal_not_found")
+				return
+			}
+			writeError(w, http.StatusInternalServerError, "internal", "database error")
+			return
+		}
+		card, err := (store.Cards{DB: s.DB}).GetByCardNumber(r.Context(), req.CardNumber)
+		if err != nil {
+			if err == store.ErrNotFound {
+				writeError(w, http.StatusBadRequest, "bad_request", "card_not_found")
+				return
+			}
+			writeError(w, http.StatusInternalServerError, "internal", "database error")
+			return
+		}
+		txnStore := store.Transactions{DB: s.DB}
+		if req.Operation == "debit_card" {
+			_, err = txnStore.ApplyDebit(r.Context(), card.ID, terminal.ID, req.Amount)
+		} else {
+			_, err = txnStore.ApplyCredit(r.Context(), card.ID, terminal.ID, req.Amount)
+		}
+		if err != nil {
+			if errors.Is(err, store.ErrInsufficientFunds) {
+				writeError(w, http.StatusConflict, "insufficient_funds", "insufficient funds")
+				return
+			}
+			writeError(w, http.StatusInternalServerError, "internal", "database error")
+			return
+		}
 	}
 
 	ev, err := (store.TerminalEvents{DB: s.DB}).Create(r.Context(), store.CreateTerminalEventParams{

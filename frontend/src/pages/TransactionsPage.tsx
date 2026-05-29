@@ -7,6 +7,8 @@ import { EntityDialog } from '../components/EntityDialog'
 import * as api from '../api/resources'
 import type { Terminal, CardEntity, TransactionEntity } from '../types/api'
 
+const POLL_MS = 2000
+
 export function TransactionsPage() {
   const [rows, setRows] = useState<TransactionEntity[]>([])
   const [cards, setCards] = useState<CardEntity[]>([])
@@ -15,8 +17,8 @@ export function TransactionsPage() {
   const [open, setOpen] = useState(false)
   const [editRow, setEditRow] = useState<TransactionEntity | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const [tRows, cs, tm] = await Promise.all([
         api.listTransactions(),
@@ -26,13 +28,22 @@ export function TransactionsPage() {
       setRows(tRows)
       setCards(cs)
       setTerminals(tm)
+    } catch {
+      /* сеть недоступна — тихий пропуск при фоновом опросе */
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
   useEffect(() => {
     void load()
+  }, [load])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void load(true)
+    }, POLL_MS)
+    return () => window.clearInterval(timer)
   }, [load])
 
   const createFields: FormFieldDef[] = useMemo(

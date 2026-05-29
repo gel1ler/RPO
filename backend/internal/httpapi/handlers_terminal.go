@@ -55,6 +55,10 @@ func (s Server) handleTerminalAuthorize(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, "bad_request", "terminal_serial_number, card_number and amount are required")
 		return
 	}
+	if !terminalSerialMatches(r.Context(), req.TerminalSerialNumber) {
+		writeTerminalSerialMismatch(w)
+		return
+	}
 
 	resp := terminalAuthorizeResponse{Approved: false, Reason: "internal"}
 
@@ -98,8 +102,10 @@ func (s Server) handleTerminalAuthorize(w http.ResponseWriter, r *http.Request) 
 // @Tags         terminal
 // @Produce      json
 // @Success      200  {array}   SwaggerKeyDTO
+// @Failure      401  {object}  SwaggerErrorResponse
 // @Failure      500  {object}  SwaggerErrorResponse
 // @Router       /terminal/keys [get]
+// @Security     BearerAuth
 func (s Server) handleTerminalKeys(w http.ResponseWriter, r *http.Request) {
 	items, err := (store.Keys{DB: s.DB}).List(r.Context(), 500, 0)
 	if err != nil {
@@ -125,7 +131,7 @@ type terminalRegisterCardResponse struct {
 	Created bool    `json:"created"`
 }
 
-// handleTerminalRegisterCard — регистрация карты в БД с терминала (без JWT).
+// handleTerminalRegisterCard — регистрация карты в БД с терминала (Bearer terminal JWT).
 func (s Server) handleTerminalRegisterCard(w http.ResponseWriter, r *http.Request) {
 	var req terminalRegisterCardRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -137,6 +143,10 @@ func (s Server) handleTerminalRegisterCard(w http.ResponseWriter, r *http.Reques
 	req.CardNumber = strings.TrimSpace(req.CardNumber)
 	if req.TerminalSerialNumber == "" || req.CardNumber == "" {
 		writeError(w, http.StatusBadRequest, "bad_request", "terminal_serial_number and card_number are required")
+		return
+	}
+	if !terminalSerialMatches(r.Context(), req.TerminalSerialNumber) {
+		writeTerminalSerialMismatch(w)
 		return
 	}
 	if req.Balance < 0 {

@@ -67,7 +67,23 @@ class _TerminalScreenState extends State<TerminalScreen>
         if (_cardWaitVisible && mounted) setState(() {});
       });
     _refreshReaderStatus();
-    _loadKeysQuietly();
+    _bootstrapApi();
+  }
+
+  Future<void> _bootstrapApi() async {
+    try {
+      await _api.login(
+        serialNumber: TerminalConfig.serialNumber,
+        apiSecret: TerminalConfig.apiSecret,
+      );
+      await _loadKeysQuietly();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _keysLoadError = 'Авторизация терминала: $e';
+        _status = 'Не удалось войти на сервер. Проверьте docker compose и api_secret.';
+      });
+    }
   }
 
   void _onTabChanged() {
@@ -189,15 +205,6 @@ class _TerminalScreenState extends State<TerminalScreen>
     }
   }
 
-  Future<void> _syncCardStateToBackend(CardPayload payload) {
-    return _api.syncCardState(
-      terminalSerial: TerminalConfig.serialNumber,
-      cardNumber: payload.cardNumber,
-      balance: payload.balance,
-      keyId: payload.keyId,
-    );
-  }
-
   Future<void> _readBalance() async {
     await _run('Считать карту', () async {
       final keyHex = _requireMifareKeyHex();
@@ -291,7 +298,6 @@ class _TerminalScreenState extends State<TerminalScreen>
           payload.toJsonString(),
         ),
       );
-      await _syncCardStateToBackend(payload);
       await _api.postTerminalEvent({
         'terminal_serial_number': TerminalConfig.serialNumber,
         'card_number': payload.cardNumber,
@@ -326,7 +332,6 @@ class _TerminalScreenState extends State<TerminalScreen>
           payload.toJsonString(),
         ),
       );
-      await _syncCardStateToBackend(payload);
       await _api.postTerminalEvent({
         'terminal_serial_number': TerminalConfig.serialNumber,
         'card_number': payload.cardNumber,
