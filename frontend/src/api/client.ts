@@ -1,3 +1,5 @@
+import axios from 'axios'
+
 export const TOKEN_KEY = 'rpo_token'
 
 export function getToken(): string | null {
@@ -27,6 +29,10 @@ export class ApiError extends Error {
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getToken()
   const headers = new Headers(init?.headers)
+  const axiosHeaders: Record<string, string> = {}
+  headers.forEach((value, key) => {
+    axiosHeaders[key] = value
+  })
   const body = init?.body
   if (body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
@@ -35,30 +41,43 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     headers.set('Authorization', `Bearer ${token}`)
   }
 
-  const res = await fetch(`/api/v1${path}`, { ...init, headers })
+  try {
+    const res = await axios.request<T>({
+      url: `/api/v1${path}`,
+      method: init?.method,
+      headers: axiosHeaders,
+      data: body,
+      signal: init?.signal,
+      withCredentials: init?.credentials === 'include',
+    })
 
-  if (res.status === 204) {
-    return undefined as T
-  }
-
-  const text = await res.text()
-  let parsed: unknown = null
-  if (text) {
-    try {
-      parsed = JSON.parse(text) as unknown
-    } catch {
-      parsed = null
+    if (res.status === 204) {
+      return undefined as T
     }
-  }
 
-  if (!res.ok) {
-    const errBody = parsed as { error?: string; message?: string } | null
-    throw new ApiError(
-      res.status,
-      errBody?.error ?? 'error',
-      (errBody?.message ?? text) || res.statusText,
-    )
-  }
+    return res.data
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status ?? 0
+      const rawData = error.response?.data as unknown
+      const statusText = error.response?.statusText ?? error.message
 
-  return parsed as T
+      if (rawData && typeof rawData === 'object') {
+        const errBody = rawData as { error?: string; message?: string }
+        throw new ApiError(
+          status,
+          errBody.error ?? error.code ?? 'error',
+          errBody.message ?? statusText,
+        )
+      }
+
+      if (typeof rawData === 'string') {
+        throw new ApiError(status, error.code ?? 'error', rawData || statusText)
+      }
+
+      throw new ApiError(status, error.code ?? 'error', statusText)
+    }
+
+    throw error
+  }
 }
