@@ -1,0 +1,121 @@
+% $ biblatex auxiliary file $
+% $ biblatex bbl format version 3.3 $
+% Do not modify the above lines!
+%
+% This is an auxiliary file used by the 'biblatex' package.
+% This file may safely be deleted. It will be recreated by
+% biber as required.
+%
+\begingroup
+\makeatletter
+\@ifundefined{ver@biblatex.sty}
+  {\@latex@error
+     {Missing 'biblatex' package}
+     {The bibliography requires the 'biblatex' package.}
+      \aftergroup\endinput}
+  {}
+\endgroup
+
+
+\refsection{0}
+  \datalist[entry]{none/global//global/global/global}
+    \entry{go_lang}{misc}{}{}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labeltitlesource}{title}
+      \field{howpublished}{\url{https://go.dev/doc/}}
+      \field{note}{дата обращения: 11.06.2026}
+      \field{title}{Documentation --- The Go Programming Language}
+    \endentry
+    \entry{docker}{misc}{}{}
+      \field{sortinit}{2}
+      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
+      \field{labeltitlesource}{title}
+      \field{howpublished}{\url{https://docs.docker.com/}}
+      \field{note}{дата обращения: 11.06.2026}
+      \field{title}{Docker Documentation}
+    \endentry
+    \entry{sqlite}{misc}{}{}
+      \field{sortinit}{3}
+      \field{sortinithash}{ad6fe7482ffbd7b9f99c9e8b5dccd3d7}
+      \field{labeltitlesource}{title}
+      \field{howpublished}{\url{https://www.sqlite.org/about.html}}
+      \field{note}{дата обращения: 11.06.2026}
+      \field{title}{SQLite: About}
+    \endentry
+    \entry{jwt_rfc}{misc}{}{}
+      \field{sortinit}{4}
+      \field{sortinithash}{9381316451d1b9788675a07e972a12a7}
+      \field{labeltitlesource}{title}
+      \field{howpublished}{\url{https://www.rfc-editor.org/rfc/rfc7519}}
+      \field{note}{дата обращения: 11.06.2026}
+      \field{title}{RFC 7519: JSON Web Token (JWT)}
+    \endentry
+    \entry{libnfc}{misc}{}{}
+      \field{sortinit}{5}
+      \field{sortinithash}{20e9b4b0b173788c5dace24730f47d8c}
+      \field{labeltitlesource}{title}
+      \field{howpublished}{\url{https://github.com/nfc-tools/libnfc}}
+      \field{note}{дата обращения: 11.06.2026}
+      \field{title}{libnfc: Near Field Communication (NFC) library}
+    \endentry
+    \entry{mifare_classic}{misc}{}{}
+      \field{sortinit}{6}
+      \field{sortinithash}{b33bc299efb3c36abec520a4c896a66d}
+      \field{labeltitlesource}{title}
+      \field{howpublished}{\url{https://github.com/ikarus23/MifareClassicTool/blob/master/README.md}}
+      \field{note}{дата обращения: 11.06.2026}
+      \field{title}{MIFARE Classic 1K: Memory Layout}
+    \endentry
+    \entry{pn532}{misc}{}{}
+      \field{sortinit}{7}
+      \field{sortinithash}{108d0be1b1bee9773a1173443802c0a3}
+      \field{labeltitlesource}{title}
+      \field{howpublished}{\url{https://learn.adafruit.com/adafruit-pn532-rfid-nfc}}
+      \field{note}{дата обращения: 11.06.2026}
+      \field{title}{Adafruit PN532 RFID/NFC Breakout and Shield}
+    \endentry
+    \entry{openssl}{misc}{}{}
+      \field{sortinit}{8}
+      \field{sortinithash}{a231b008ebf0ecbe0b4d96dcc159445f}
+      \field{labeltitlesource}{title}
+      \field{howpublished}{\url{https://www.openssl.org/docs/manmaster/man3/EVP_EncryptInit.html}}
+      \field{note}{дата обращения: 11.06.2026}
+      \field{title}{OpenSSL: Cryptography and SSL/TLS Toolkit}
+    \endentry
+    \entry{swaggo}{misc}{}{}
+      \field{sortinit}{9}
+      \field{sortinithash}{0a5ebc79d83c96b6579069544c73c7d4}
+      \field{labeltitlesource}{title}
+      \field{howpublished}{\url{https://github.com/swaggo/swag}}
+      \field{note}{дата обращения: 11.06.2026}
+      \field{title}{swaggo/swag: Swagger documentation generator for Go}
+    \endentry
+    \entry{mui}{misc}{}{}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labeltitlesource}{title}
+      \field{howpublished}{\url{https://mui.com/}}
+      \field{note}{дата обращения: 11.06.2026}
+      \field{title}{Material UI: React component library}
+    \endentry
+    \entry{react}{misc}{}{}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labeltitlesource}{title}
+      \field{howpublished}{\url{https://react.dev/}}
+      \field{note}{дата обращения: 11.06.2026}
+      \field{title}{React: The library for web and native user interfaces}
+    \endentry
+    \entry{flutter_ffi}{misc}{}{}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labeltitlesource}{title}
+      \field{howpublished}{\url{https://dart.dev/guides/libraries/c-interop}}
+      \field{note}{дата обращения: 11.06.2026}
+      \field{title}{Dart FFI: binding to native C APIs}
+    \endentry
+  \enddatalist
+\endrefsection
+\endinput
+
